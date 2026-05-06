@@ -16,50 +16,61 @@ export const authOptions: NextAuthOptions = {
           return null
         }
 
+        const email = String(credentials.email).toLowerCase().trim()
+        const password = String(credentials.password)
+
         const user = await prisma.user.findUnique({
-          where: { email: String(credentials.email) },
+          where: { email },
         })
 
-        if (!user) return null
+        if (!user?.passwordHash) {
+          return null
+        }
 
-        const isValid = await bcrypt.compare(
-          String(credentials.password),
-          user.passwordHash
-        )
+        const isValid = await bcrypt.compare(password, user.passwordHash)
 
-        if (!isValid) return null
+        if (!isValid) {
+          return null
+        }
 
         return {
           id: user.id,
           email: user.email,
           name: user.name,
           role: user.role,
-        } as any
+          companyStatus: user.companyStatus,
+        } as {
+          id: string
+          email: string
+          name: string
+          role: string
+          companyStatus: string
+        }
       },
     }),
   ],
-
   session: {
     strategy: "jwt",
   },
-
+  pages: {
+    signIn: "/login",
+  },
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
         token.role = (user as { role?: string }).role
+        token.companyStatus = (user as { companyStatus?: string }).companyStatus
       }
       return token
     },
-
     async session({ session, token }) {
       if (session.user) {
-        ;(session.user as { role?: string }).role = token.role as string
+        ;(session.user as { role?: string; companyStatus?: string }).role =
+          token.role as string
+        ;(session.user as { role?: string; companyStatus?: string }).companyStatus =
+          token.companyStatus as string
       }
       return session
     },
   },
-
-pages: {
-  signIn: "/login",
-},
 }
