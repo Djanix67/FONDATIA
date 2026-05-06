@@ -1,7 +1,17 @@
+import { createClient } from "@supabase/supabase-js"
 import { z } from "zod"
 
+export const companyDocumentTypeSchema = z.enum([
+  "kbis",
+  "insuranceDecennale",
+  "identityCardFront",
+  "identityCardBack",
+])
+
+export type CompanyDocumentType = z.infer<typeof companyDocumentTypeSchema>
+
 export const documentUploadRequestSchema = z.object({
-  documentType: z.enum(["kbis", "insuranceDecennale"]),
+  documentType: companyDocumentTypeSchema,
   fileName: z.string().min(1),
   contentType: z.string().min(1),
 })
@@ -11,6 +21,15 @@ const storageConfigSchema = z.object({
   serviceRoleKey: z.string().min(1),
   bucket: z.string().min(1),
 })
+
+const allowedMimeTypes = new Set([
+  "application/pdf",
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+])
+
+const maxUploadSize = 10 * 1024 * 1024
 
 export function getStorageConfig() {
   return storageConfigSchema.parse({
@@ -24,37 +43,74 @@ function sanitizeFileName(fileName: string) {
   return fileName.toLowerCase().replace(/[^a-z0-9.-]+/g, "-")
 }
 
-export function buildCompanyDocumentPath({
-  userId,
-  documentType,
-  fileName,
-}: {
-  userId: string
-  documentType: "kbis" | "insuranceDecennale"
-  fileName: string
-}) {
-  return `${userId}/${documentType}/${Date.now()}-${sanitizeFileName(fileName)}`
-}
-
-export function prepareCompanyDocumentUpload({
-  userId,
-  documentType,
-  fileName,
-  contentType,
-}: {
-  userId: string
-  documentType: "kbis" | "insuranceDecennale"
-  fileName: string
-  contentType: string
-}) {
+function createStorageClient() {
   const config = getStorageConfig()
-  const path = buildCompanyDocumentPath({ userId, documentType, fileName })
 
   return {
-    provider: "supabase-storage",
+    config,
+    supabase: createClient(config.supabaseUrl, config.serviceRoleKey),
+  }
+}
+
+export function buildCompanyDocumentPath({
+  ownerKey,
+  documentType,
+  fileName,
+}: {
+  ownerKey: string
+  documentType: CompanyDocumentType
+  fileName: string
+}) {
+  return `${ownerKey}/${documentType}/${Date.now()}-${sanitizeFileName(fileName)}`
+}
+
+function buildStorageObjectUrl(bucket: string, path: string) {
+  const { supabaseUrl } = getStorageConfig()
+  return `${supabaseUrl}/storage/v1/object/${bucket}/${path}`
+}
+
+export function validateCompanyDocumentFile(file: File) {
+  if (!allowedMimeTypes.has(file.type)) {
+    throw new Error("Format non pris en charge. Utilisez PDF, JPG, PNG ou WEBP.")
+  }
+
+  if (file.size > maxUploadSize) {
+    throw new Error("Fichier trop volumineux. Limite : 10 Mo.")
+  }
+}
+
+export async function uploadSignupDocument({
+  draftId,
+  documentType,
+  file,
+}: {
+  draftId: string
+  documentType: CompanyDocumentType
+  file: File
+}) {
+  validateCompanyDocumentFile(file)
+
+  const { config, supabase } = createStorageClient()
+  const path = buildCompanyDocumentPath({
+    ownerKey: `signup-drafts/${draftId}`,
+    documentType,
+    fileName: file.name,
+  })
+
+  const arrayBuffer = await file.arrayBuffer()
+  const { error } = await supabase.storage.from(config.bucket).upload(path, arrayBuffer, {
+    contentType: file.type,
+    upsert: false,
+  })
+
+  if (error) {
+    throw new Error("Impossible de televerser le document pour l'instant.")
+  }
+
+  return {
     bucket: config.bucket,
     path,
-    contentType,
-    uploadStrategy: "signed-upload-url",
+    url: buildStorageObjectUrl(config.bucket, path),
+    contentType: file.type,
   }
 }
