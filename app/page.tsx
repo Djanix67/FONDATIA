@@ -49,11 +49,7 @@ export default function HomePage() {
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top,rgba(38,99,235,0.16),transparent_28%),linear-gradient(180deg,#030712_0%,#06111f_38%,#020617_100%)] text-white">
       <div className="mx-auto max-w-7xl px-6 py-8 lg:px-8">
-        <header className="flex items-center justify-between gap-4">
-          <div className="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm tracking-[0.18em] text-white/75 backdrop-blur">
-            FONDATIA
-          </div>
-
+        <header className="flex items-center justify-end gap-4 pt-2">
           <div className="flex items-center gap-3">
             <Link
               href="/login"
@@ -82,7 +78,7 @@ export default function HomePage() {
 
             <p className="mt-6 max-w-2xl text-lg leading-8 text-white/65">
               FONDATIA pose un cadre plus selectif pour l'inscription artisan,
-              la validation admin, la lecture des statuts et la future monétisation
+              la validation admin, la lecture des statuts et la future monetisation
               des leads. L'objectif n'est pas le volume cheap, mais la confiance.
             </p>
 
