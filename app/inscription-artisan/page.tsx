@@ -9,14 +9,14 @@ const initialForm = {
   email: "",
   password: "",
   phone: "",
-  companyName: "",
+  legalName: "",
   siren: "",
   siret: "",
   address: "",
   postalCode: "",
   city: "",
   kbisUrl: "",
-  insuranceUrl: "",
+  insuranceDecennaleUrl: "",
 }
 
 export default function InscriptionArtisanPage() {
@@ -63,16 +63,15 @@ export default function InscriptionArtisanPage() {
         <div className="grid w-full gap-10 lg:grid-cols-[1fr_620px]">
           <div className="flex flex-col justify-center">
             <div className="inline-flex w-fit items-center rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-white/70 backdrop-blur">
-              FONDATIA • Réseau BTP premium
+              FONDATIA • Reseau BTP premium
             </div>
 
             <h1 className="mt-6 max-w-2xl text-4xl font-semibold tracking-tight text-white sm:text-5xl">
-              Rejoignez FONDATIA en tant qu’artisan
+              Rejoignez FONDATIA en tant qu'artisan
             </h1>
 
             <p className="mt-5 max-w-xl text-base leading-7 text-white/65 sm:text-lg">
-              Déposez votre dossier en quelques minutes. Votre entreprise sera
-              ensuite vérifiée par l’équipe avant validation définitive.
+              Deposez votre dossier en quelques minutes. Votre entreprise sera ensuite verifiee par l'equipe avant validation definitive.
             </p>
           </div>
 
@@ -82,7 +81,7 @@ export default function InscriptionArtisanPage() {
                 Inscription artisan
               </h2>
               <p className="mt-2 text-sm text-white/60">
-                Renseignez vos informations personnelles et celles de votre entreprise.
+                Le MVP collecte encore les liens de documents. L'upload Storage est prepare juste apres.
               </p>
             </div>
 
@@ -96,7 +95,7 @@ export default function InscriptionArtisanPage() {
                   <Field label="Nom" value={form.name} onChange={(value) => updateField("name", value)} placeholder="Jean Dupont" />
                   <Field label="Email" type="email" value={form.email} onChange={(value) => updateField("email", value)} placeholder="jean@exemple.fr" />
                   <Field label="Mot de passe" type="password" value={form.password} onChange={(value) => updateField("password", value)} placeholder="••••••••" />
-                  <Field label="Téléphone" value={form.phone} onChange={(value) => updateField("phone", value)} placeholder="06 00 00 00 00" />
+                  <Field label="Telephone" value={form.phone} onChange={(value) => updateField("phone", value)} placeholder="06 00 00 00 00" />
                 </div>
               </section>
 
@@ -107,7 +106,7 @@ export default function InscriptionArtisanPage() {
 
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="sm:col-span-2">
-                    <Field label="Raison sociale" value={form.companyName} onChange={(value) => updateField("companyName", value)} placeholder="Dupont Construction" />
+                    <Field label="Raison sociale" value={form.legalName} onChange={(value) => updateField("legalName", value)} placeholder="Dupont Construction" />
                   </div>
 
                   <Field
@@ -136,9 +135,9 @@ export default function InscriptionArtisanPage() {
 
                   <div className="sm:col-span-2">
                     <Field
-                      label="URL assurance décennale"
-                      value={form.insuranceUrl}
-                      onChange={(value) => updateField("insuranceUrl", value)}
+                      label="URL assurance decennale"
+                      value={form.insuranceDecennaleUrl}
+                      onChange={(value) => updateField("insuranceDecennaleUrl", value)}
                       placeholder="https://..."
                     />
                   </div>
@@ -156,7 +155,7 @@ export default function InscriptionArtisanPage() {
                 disabled={loading}
                 className="w-full rounded-2xl border border-blue-400/20 bg-blue-500/15 px-5 py-4 text-sm font-medium text-white transition hover:bg-blue-500/25 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {loading ? "Création du dossier..." : "Créer mon dossier artisan"}
+                {loading ? "Creation du dossier..." : "Creer mon dossier artisan"}
               </button>
             </form>
           </GlassCard>
