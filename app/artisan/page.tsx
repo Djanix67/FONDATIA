@@ -35,6 +35,14 @@ export default async function ArtisanPage() {
       label: "Assurance decennale",
       ready: Boolean(company?.insuranceDecennaleUrl),
     },
+    {
+      label: "Carte d'identite recto",
+      ready: Boolean(company?.identityCardFrontUrl),
+    },
+    {
+      label: "Carte d'identite verso",
+      ready: Boolean(company?.identityCardBackUrl),
+    },
   ]
 
   const completedDocuments = documentItems.filter((item) => item.ready).length
@@ -72,7 +80,7 @@ export default async function ArtisanPage() {
 
         <section className="space-y-6">
           <div className="grid gap-4 sm:grid-cols-3">
-            <MetricCard label="Documents recus" value={`${completedDocuments}/2`} />
+            <MetricCard label="Documents recus" value={`${completedDocuments}/4`} />
             <MetricCard
               label="Dossier cree le"
               value={company ? formatDate(company.createdAt) : "Non disponible"}
@@ -155,7 +163,7 @@ function getNextSteps(status: CompanyStatus, rejectedReason?: string | null) {
     return [
       "Votre dossier est valide et pret pour les futures opportunites diffusees sur la plateforme.",
       "Les prochains lots produit prepareront les leads qualifies, les notifications et la monetisation.",
-      "Conservez vos informations entreprise a jour pour garder un profil exploitable.",
+      "Conservez vos informations entreprise et vos justificatifs a jour pour garder un profil exploitable.",
     ]
   }
 
@@ -179,7 +187,7 @@ function getNextSteps(status: CompanyStatus, rejectedReason?: string | null) {
 
   return [
     "Votre dossier est en cours de verification par l'equipe FONDATIA.",
-    "Assurez-vous que vos informations entreprise et vos documents sont complets et lisibles.",
+    "Assurez-vous que vos informations entreprise et vos quatre justificatifs sont complets et lisibles.",
     "Le statut evoluera automatiquement ici apres validation admin.",
   ]
 }
