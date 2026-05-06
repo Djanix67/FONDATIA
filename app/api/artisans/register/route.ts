@@ -23,6 +23,7 @@ export async function POST(req: Request) {
       email,
       password,
       phone,
+      profileType,
       legalName,
       siren,
       siret,
@@ -65,14 +66,15 @@ export async function POST(req: Request) {
     }
 
     const passwordHash = await bcrypt.hash(password, 10)
+    const companyStatus = profileType === "ARTISAN" ? "PENDING" : "APPROVED"
 
     const user = await prisma.user.create({
       data: {
         name,
         email: normalizedEmail,
         passwordHash,
-        role: "ARTISAN",
-        companyStatus: "PENDING",
+        role: profileType,
+        companyStatus,
         company: {
           create: {
             legalName,
@@ -85,7 +87,7 @@ export async function POST(req: Request) {
             city,
             kbisUrl,
             insuranceDecennaleUrl,
-            status: "PENDING",
+            status: companyStatus,
           },
         },
       },
@@ -99,6 +101,10 @@ export async function POST(req: Request) {
         success: true,
         userId: user.id,
         companyId: user.company?.id,
+        redirectTo:
+          profileType === "ARTISAN"
+            ? "/validation-en-attente"
+            : "/login?callbackUrl=/donneur-ordre",
       },
       { status: 201 }
     )
