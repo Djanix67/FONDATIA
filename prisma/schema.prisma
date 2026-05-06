@@ -36,6 +36,8 @@ model Company {
   address               String
   kbisUrl               String
   insuranceDecennaleUrl String
+  identityCardFrontUrl  String
+  identityCardBackUrl   String
   status                CompanyStatus @default(PENDING)
   validatedAt           DateTime?
   rejectedReason        String?
