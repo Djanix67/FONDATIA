@@ -2,6 +2,8 @@ import { NextResponse } from "next/server"
 import bcrypt from "bcryptjs"
 import { prisma } from "@/lib/prisma"
 import { artisanRegisterSchema } from "@/lib/validations/artisan-register"
+import { sendTransactionalEmail } from "@/lib/email"
+import { applicationReceivedTemplate } from "@/emails/templates"
 
 export async function POST(req: Request) {
   try {
@@ -32,6 +34,8 @@ export async function POST(req: Request) {
       city,
       kbisUrl,
       insuranceDecennaleUrl,
+      identityCardFrontUrl,
+      identityCardBackUrl,
     } = parsed.data
 
     const normalizedEmail = email.toLowerCase().trim()
@@ -87,6 +91,8 @@ export async function POST(req: Request) {
             city,
             kbisUrl,
             insuranceDecennaleUrl,
+            identityCardFrontUrl,
+            identityCardBackUrl,
             status: companyStatus,
           },
         },
@@ -95,6 +101,16 @@ export async function POST(req: Request) {
         company: true,
       },
     })
+
+    if (profileType === "ARTISAN") {
+      const template = applicationReceivedTemplate(legalName)
+
+      await sendTransactionalEmail({
+        to: normalizedEmail,
+        subject: template.subject,
+        html: template.html,
+      }).catch(() => null)
+    }
 
     return NextResponse.json(
       {
