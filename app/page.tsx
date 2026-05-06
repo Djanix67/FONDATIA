@@ -94,25 +94,25 @@ export default function HomePage() {
           <div className="flex flex-wrap items-center justify-end gap-3 text-sm">
             <a
               href="#marches-en-ligne"
-              className="rounded-2xl border border-white/45 bg-white/45 px-4 py-2 text-slate-700 shadow-[0_12px_30px_rgba(130,174,200,0.18)] backdrop-blur-xl transition hover:bg-white/60 hover:text-slate-900"
+              className="rounded-2xl border border-white/45 bg-white/45 px-4 py-2 text-slate-700 shadow-[0_12px_30px_rgba(130,174,200,0.18)] backdrop-blur-xl transition hover:border-slate-900 hover:bg-slate-900 hover:text-white"
             >
               Les marches en ligne
             </a>
             <a
               href="#qui-sommes-nous"
-              className="rounded-2xl border border-white/45 bg-white/45 px-4 py-2 text-slate-700 shadow-[0_12px_30px_rgba(130,174,200,0.18)] backdrop-blur-xl transition hover:bg-white/60 hover:text-slate-900"
+              className="rounded-2xl border border-white/45 bg-white/45 px-4 py-2 text-slate-700 shadow-[0_12px_30px_rgba(130,174,200,0.18)] backdrop-blur-xl transition hover:border-slate-900 hover:bg-slate-900 hover:text-white"
             >
               Qui sommes nous ?
             </a>
             <Link
               href="/login"
-              className="rounded-2xl border border-white/45 bg-white/45 px-4 py-2 text-slate-700 shadow-[0_12px_30px_rgba(130,174,200,0.18)] backdrop-blur-xl transition hover:bg-white/60 hover:text-slate-900"
+              className="rounded-2xl border border-white/45 bg-white/45 px-4 py-2 text-slate-700 shadow-[0_12px_30px_rgba(130,174,200,0.18)] backdrop-blur-xl transition hover:border-slate-900 hover:bg-slate-900 hover:text-white"
             >
               Connexion
             </Link>
             <Link
               href="/inscription-artisan"
-              className="rounded-2xl border border-sky-200/80 bg-sky-300/30 px-4 py-2 font-medium text-slate-900 shadow-[0_14px_34px_rgba(114,177,214,0.22)] backdrop-blur-xl transition hover:bg-sky-300/45"
+              className="rounded-2xl border border-sky-200/80 bg-sky-300/30 px-4 py-2 font-medium text-slate-900 shadow-[0_14px_34px_rgba(114,177,214,0.22)] backdrop-blur-xl transition hover:border-slate-900 hover:bg-slate-900 hover:text-white"
             >
               Rejoindre Fondatia
             </Link>
@@ -139,13 +139,13 @@ export default function HomePage() {
             <div className="mt-10 flex flex-wrap gap-4">
               <Link
                 href="/inscription-artisan"
-                className="rounded-2xl border border-sky-200/80 bg-sky-300/30 px-6 py-4 text-sm font-medium text-slate-900 shadow-[0_14px_34px_rgba(114,177,214,0.22)] backdrop-blur-xl transition hover:bg-sky-300/45"
+                className="rounded-2xl border border-sky-200/80 bg-sky-300/30 px-6 py-4 text-sm font-medium text-slate-900 shadow-[0_14px_34px_rgba(114,177,214,0.22)] backdrop-blur-xl transition hover:border-slate-900 hover:bg-slate-900 hover:text-white"
               >
                 Creer mon profil
               </Link>
               <Link
                 href="/login"
-                className="rounded-2xl border border-white/45 bg-white/45 px-6 py-4 text-sm font-medium text-slate-700 shadow-[0_12px_30px_rgba(130,174,200,0.18)] backdrop-blur-xl transition hover:bg-white/60 hover:text-slate-900"
+                className="rounded-2xl border border-white/45 bg-white/45 px-6 py-4 text-sm font-medium text-slate-700 shadow-[0_12px_30px_rgba(130,174,200,0.18)] backdrop-blur-xl transition hover:border-slate-900 hover:bg-slate-900 hover:text-white"
               >
                 Acceder a mon espace
               </Link>
@@ -239,7 +239,7 @@ export default function HomePage() {
                 <div className="mt-6">
                   <Link
                     href={segment.cta}
-                    className="rounded-2xl border border-white/45 bg-white/45 px-5 py-3 text-sm font-medium text-slate-800 shadow-[0_10px_24px_rgba(130,174,200,0.14)] backdrop-blur-xl transition hover:bg-white/60"
+                    className="rounded-2xl border border-white/45 bg-white/45 px-5 py-3 text-sm font-medium text-slate-800 shadow-[0_10px_24px_rgba(130,174,200,0.14)] backdrop-blur-xl transition hover:border-slate-900 hover:bg-slate-900 hover:text-white"
                   >
                     {segment.label}
                   </Link>
