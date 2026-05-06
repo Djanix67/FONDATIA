@@ -110,6 +110,14 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                 label: "Assurance decennale",
                 ready: Boolean(company.insuranceDecennaleUrl),
               },
+              {
+                label: "Carte d'identite recto",
+                ready: Boolean(company.identityCardFrontUrl),
+              },
+              {
+                label: "Carte d'identite verso",
+                ready: Boolean(company.identityCardBackUrl),
+              },
             ]
 
             return (
@@ -140,11 +148,11 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                       ))}
                     </div>
 
-                    <div className="mt-6 flex flex-wrap gap-3">
+                    <div className="mt-6 grid gap-3 sm:grid-cols-2">
                       {documents.map((document) => (
                         <div
                           key={document.label}
-                          className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-slate-200"
+                          className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-slate-200"
                         >
                           {document.label} : {document.ready ? "recu" : "manquant"}
                         </div>
