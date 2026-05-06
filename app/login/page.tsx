@@ -1,5 +1,6 @@
 "use client"
 
+import Link from "next/link"
 import { useState } from "react"
 import { signIn } from "next-auth/react"
 import { useRouter } from "next/navigation"
@@ -44,16 +45,15 @@ export default function LoginPage() {
         <div className="grid w-full max-w-5xl gap-10 lg:grid-cols-[1fr_520px]">
           <div className="flex flex-col justify-center">
             <div className="inline-flex w-fit items-center rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-white/70 backdrop-blur">
-              FONDATIA • Accès sécurisé
+              FONDATIA • Acces securise
             </div>
 
             <h1 className="mt-6 max-w-2xl text-4xl font-semibold tracking-tight text-white sm:text-5xl">
-              Connectez-vous à votre espace FONDATIA
+              Connectez-vous a votre espace FONDATIA
             </h1>
 
             <p className="mt-5 max-w-xl text-base leading-7 text-white/65 sm:text-lg">
-              Accédez à votre interface en toute sécurité pour gérer vos dossiers,
-              votre activité et vos validations.
+              Le login envoie vers l'espace admin, puis la page decide si le compte peut y acceder. Les comptes non admin sont bloques hors de cette zone.
             </p>
           </div>
 
@@ -63,7 +63,7 @@ export default function LoginPage() {
                 Connexion
               </h2>
               <p className="mt-2 text-sm text-white/60">
-                Entrez vos identifiants pour accéder à votre espace.
+                Entrez vos identifiants pour acceder a votre espace.
               </p>
             </div>
 
@@ -97,6 +97,15 @@ export default function LoginPage() {
               >
                 {loading ? "Connexion..." : "Se connecter"}
               </button>
+
+              <div className="flex items-center justify-between gap-4 text-sm text-white/55">
+                <Link href="/mot-de-passe-oublie" className="transition hover:text-white">
+                  Mot de passe oublie ?
+                </Link>
+                <Link href="/inscription-artisan" className="transition hover:text-white">
+                  Devenir artisan
+                </Link>
+              </div>
             </form>
           </GlassCard>
         </div>
