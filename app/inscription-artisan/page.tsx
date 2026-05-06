@@ -9,6 +9,7 @@ const initialForm = {
   email: "",
   password: "",
   phone: "",
+  profileType: "ARTISAN",
   legalName: "",
   siren: "",
   siret: "",
@@ -17,7 +18,7 @@ const initialForm = {
   city: "",
   kbisUrl: "",
   insuranceDecennaleUrl: "",
-}
+} as const
 
 export default function InscriptionArtisanPage() {
   const router = useRouter()
@@ -49,7 +50,7 @@ export default function InscriptionArtisanPage() {
         throw new Error(data?.error || "Une erreur est survenue")
       }
 
-      router.push("/validation-en-attente")
+      router.push(data?.redirectTo ?? "/validation-en-attente")
     } catch (err) {
       setError(err instanceof Error ? err.message : "Une erreur est survenue")
     } finally {
@@ -67,21 +68,21 @@ export default function InscriptionArtisanPage() {
             </div>
 
             <h1 className="mt-6 max-w-2xl text-4xl font-semibold tracking-tight text-white sm:text-5xl">
-              Rejoignez FONDATIA en tant qu'artisan
+              Rejoignez FONDATIA
             </h1>
 
             <p className="mt-5 max-w-xl text-base leading-7 text-white/65 sm:text-lg">
-              Deposez votre dossier en quelques minutes. Votre entreprise sera ensuite verifiee par l'equipe avant validation definitive.
+              Creez un compte selon votre objectif : trouver des marches en tant qu'artisan ou trouver des artisans en tant que donneur d'ordre.
             </p>
           </div>
 
           <GlassCard className="p-6 sm:p-8">
             <div className="mb-8">
               <h2 className="text-2xl font-semibold tracking-tight text-white">
-                Inscription artisan
+                INSCRIPTION
               </h2>
               <p className="mt-2 text-sm text-white/60">
-                Le MVP collecte encore les liens de documents. L'upload Storage est prepare juste apres.
+                Le mot de passe doit contenir au minimum 8 caracteres, une majuscule, une minuscule et un caractere special.
               </p>
             </div>
 
@@ -92,10 +93,25 @@ export default function InscriptionArtisanPage() {
                 </p>
 
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <Field label="Nom" value={form.name} onChange={(value) => updateField("name", value)} placeholder="Jean Dupont" />
+                  <div className="sm:col-span-2">
+                    <Field
+                      label="Nom et Prenom du gerant"
+                      value={form.name}
+                      onChange={(value) => updateField("name", value)}
+                      placeholder="Jean Dupont"
+                    />
+                  </div>
                   <Field label="Email" type="email" value={form.email} onChange={(value) => updateField("email", value)} placeholder="jean@exemple.fr" />
-                  <Field label="Mot de passe" type="password" value={form.password} onChange={(value) => updateField("password", value)} placeholder="••••••••" />
                   <Field label="Telephone" value={form.phone} onChange={(value) => updateField("phone", value)} placeholder="06 00 00 00 00" />
+                  <div className="sm:col-span-2">
+                    <Field
+                      label="Mot de passe"
+                      type="password"
+                      value={form.password}
+                      onChange={(value) => updateField("password", value)}
+                      placeholder="••••••••"
+                    />
+                  </div>
                 </div>
               </section>
 
@@ -104,42 +120,49 @@ export default function InscriptionArtisanPage() {
                   Entreprise
                 </p>
 
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="sm:col-span-2">
-                    <Field label="Raison sociale" value={form.legalName} onChange={(value) => updateField("legalName", value)} placeholder="Dupont Construction" />
-                  </div>
-
-                  <Field
-                    label="SIREN"
-                    value={form.siren}
-                    onChange={(value) => updateField("siren", value.replace(/\D/g, "").slice(0, 9))}
-                    placeholder="123456789"
-                  />
-                  <Field
-                    label="SIRET"
-                    value={form.siret}
-                    onChange={(value) => updateField("siret", value.replace(/\D/g, "").slice(0, 14))}
-                    placeholder="12345678900012"
+                <div className="grid gap-4">
+                  <ProfileTypeField
+                    value={form.profileType}
+                    onChange={(value) => updateField("profileType", value)}
                   />
 
-                  <div className="sm:col-span-2">
-                    <Field label="Adresse" value={form.address} onChange={(value) => updateField("address", value)} placeholder="12 rue des Artisans" />
-                  </div>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="sm:col-span-2">
+                      <Field label="Raison sociale" value={form.legalName} onChange={(value) => updateField("legalName", value)} placeholder="Dupont Construction" />
+                    </div>
 
-                  <Field label="Code postal" value={form.postalCode} onChange={(value) => updateField("postalCode", value)} placeholder="67000" />
-                  <Field label="Ville" value={form.city} onChange={(value) => updateField("city", value)} placeholder="Strasbourg" />
-
-                  <div className="sm:col-span-2">
-                    <Field label="URL KBIS" value={form.kbisUrl} onChange={(value) => updateField("kbisUrl", value)} placeholder="https://..." />
-                  </div>
-
-                  <div className="sm:col-span-2">
                     <Field
-                      label="URL assurance decennale"
-                      value={form.insuranceDecennaleUrl}
-                      onChange={(value) => updateField("insuranceDecennaleUrl", value)}
-                      placeholder="https://..."
+                      label="SIREN"
+                      value={form.siren}
+                      onChange={(value) => updateField("siren", value.replace(/\D/g, "").slice(0, 9))}
+                      placeholder="123456789"
                     />
+                    <Field
+                      label="SIRET"
+                      value={form.siret}
+                      onChange={(value) => updateField("siret", value.replace(/\D/g, "").slice(0, 14))}
+                      placeholder="12345678900012"
+                    />
+
+                    <div className="sm:col-span-2">
+                      <Field label="Adresse" value={form.address} onChange={(value) => updateField("address", value)} placeholder="12 rue des Artisans" />
+                    </div>
+
+                    <Field label="Code postal" value={form.postalCode} onChange={(value) => updateField("postalCode", value)} placeholder="67000" />
+                    <Field label="Ville" value={form.city} onChange={(value) => updateField("city", value)} placeholder="Strasbourg" />
+
+                    <div className="sm:col-span-2">
+                      <Field label="URL KBIS" value={form.kbisUrl} onChange={(value) => updateField("kbisUrl", value)} placeholder="https://..." />
+                    </div>
+
+                    <div className="sm:col-span-2">
+                      <Field
+                        label="URL assurance decennale"
+                        value={form.insuranceDecennaleUrl}
+                        onChange={(value) => updateField("insuranceDecennaleUrl", value)}
+                        placeholder="https://..."
+                      />
+                    </div>
                   </div>
                 </div>
               </section>
@@ -155,7 +178,7 @@ export default function InscriptionArtisanPage() {
                 disabled={loading}
                 className="w-full rounded-2xl border border-blue-400/20 bg-blue-500/15 px-5 py-4 text-sm font-medium text-white transition hover:bg-blue-500/25 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {loading ? "Creation du dossier..." : "Creer mon dossier artisan"}
+                {loading ? "Creation du compte..." : "Creer un compte"}
               </button>
             </form>
           </GlassCard>
@@ -191,5 +214,54 @@ function Field({
         className="h-12 w-full rounded-2xl border border-white/10 bg-white/5 px-4 text-sm text-white outline-none transition placeholder:text-white/25 focus:border-white/20 focus:bg-white/[0.07]"
       />
     </label>
+  )
+}
+
+function ProfileTypeField({
+  value,
+  onChange,
+}: {
+  value: string
+  onChange: (value: string) => void
+}) {
+  const options = [
+    {
+      value: "ARTISAN",
+      title: "Je cherche des marches",
+      description: "Creation d'un compte artisan avec orientation vers le dashboard artisan.",
+    },
+    {
+      value: "DONNEUR",
+      title: "Je cherche des artisans",
+      description: "Creation d'un compte donneur d'ordre avec orientation vers le dashboard correspondant.",
+    },
+  ]
+
+  return (
+    <div>
+      <p className="mb-2 block text-sm font-medium text-white/80">Je suis ici pour</p>
+      <div className="grid gap-3 sm:grid-cols-2">
+        {options.map((option) => {
+          const active = value === option.value
+
+          return (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() => onChange(option.value)}
+              className={[
+                "rounded-2xl border p-4 text-left transition",
+                active
+                  ? "border-blue-400/30 bg-blue-500/15 text-white"
+                  : "border-white/10 bg-white/5 text-white/70 hover:bg-white/10 hover:text-white",
+              ].join(" ")}
+            >
+              <p className="text-sm font-medium">{option.title}</p>
+              <p className="mt-2 text-xs leading-6">{option.description}</p>
+            </button>
+          )
+        })}
+      </div>
+    </div>
   )
 }
