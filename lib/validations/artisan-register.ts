@@ -19,8 +19,10 @@ export const artisanRegisterSchema = z.object({
   address: z.string().min(3, "Adresse requise"),
   postalCode: z.string().min(4, "Code postal requis"),
   city: z.string().min(2, "Ville requise"),
-  kbisUrl: z.string().min(1, "Le KBIS est requis"),
-  insuranceDecennaleUrl: z.string().min(1, "L'assurance decennale est requise"),
+  kbisUrl: z.string().url("Le KBIS est requis"),
+  insuranceDecennaleUrl: z.string().url("L'assurance decennale est requise"),
+  identityCardFrontUrl: z.string().url("La carte d'identite recto est requise"),
+  identityCardBackUrl: z.string().url("La carte d'identite verso est requise"),
 })
 
 export type ArtisanRegisterInput = z.infer<typeof artisanRegisterSchema>
