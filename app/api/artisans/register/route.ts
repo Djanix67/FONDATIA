@@ -11,7 +11,7 @@ export async function POST(req: Request) {
     if (!parsed.success) {
       return NextResponse.json(
         {
-          error: "Données invalides",
+          error: "Donnees invalides",
           details: parsed.error.flatten(),
         },
         { status: 400 }
@@ -23,31 +23,33 @@ export async function POST(req: Request) {
       email,
       password,
       phone,
-      companyName,
+      legalName,
       siren,
       siret,
       address,
       postalCode,
       city,
       kbisUrl,
-      insuranceUrl,
+      insuranceDecennaleUrl,
     } = parsed.data
 
+    const normalizedEmail = email.toLowerCase().trim()
+
     const existingUser = await prisma.user.findUnique({
-      where: { email },
+      where: { email: normalizedEmail },
       select: { id: true },
     })
 
     if (existingUser) {
       return NextResponse.json(
-        { error: "Un compte existe déjà avec cet email." },
+        { error: "Un compte existe deja avec cet email." },
         { status: 409 }
       )
     }
 
     const existingCompany = await prisma.company.findFirst({
       where: {
-        OR: [{ email }, { phone }, { siren }, { siret }],
+        OR: [{ email: normalizedEmail }, { phone }, { siren }, { siret }],
       },
       select: { id: true },
     })
@@ -56,7 +58,7 @@ export async function POST(req: Request) {
       return NextResponse.json(
         {
           error:
-            "Une entreprise existe déjà avec cet email, téléphone, SIREN ou SIRET.",
+            "Une entreprise existe deja avec cet email, telephone, SIREN ou SIRET.",
         },
         { status: 409 }
       )
@@ -67,14 +69,14 @@ export async function POST(req: Request) {
     const user = await prisma.user.create({
       data: {
         name,
-        email,
+        email: normalizedEmail,
         passwordHash,
         role: "ARTISAN",
         companyStatus: "PENDING",
         company: {
           create: {
-            legalName: companyName,
-            email,
+            legalName,
+            email: normalizedEmail,
             phone,
             siren,
             siret,
@@ -82,7 +84,7 @@ export async function POST(req: Request) {
             postalCode,
             city,
             kbisUrl,
-            insuranceDecennaleUrl: insuranceUrl,
+            insuranceDecennaleUrl,
             status: "PENDING",
           },
         },
