@@ -18,22 +18,27 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   const session = await getServerSession(authOptions)
 
   if (!session?.user) {
-    redirect("/")
+    redirect("/login")
   }
 
   const role = (session.user as { role?: string }).role
 
   if (role !== "ADMIN") {
-    redirect("/")
+    redirect("/acces-interdit")
   }
 
   const params = await searchParams
   const selectedStatus = params.status
 
-  const companies = await prisma.company.findMany({
-    where: selectedStatus ? { status: selectedStatus } : undefined,
-    orderBy: { createdAt: "desc" },
-  })
+  const [companies, pendingCount, approvedCount, rejectedCount] = await Promise.all([
+    prisma.company.findMany({
+      where: selectedStatus ? { status: selectedStatus } : undefined,
+      orderBy: { createdAt: "desc" },
+    }),
+    prisma.company.count({ where: { status: "PENDING" } }),
+    prisma.company.count({ where: { status: "APPROVED" } }),
+    prisma.company.count({ where: { status: "REJECTED" } }),
+  ])
 
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top,rgba(38,99,235,0.14),transparent_28%),linear-gradient(180deg,#030712_0%,#06111f_40%,#020617_100%)] text-white">
@@ -46,34 +51,40 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
             <h1 className="mt-2 text-3xl font-semibold tracking-tight text-white">
               Entreprises artisan
             </h1>
-            <p className="mt-3 text-sm text-white/60">
-              Gérez les inscriptions et validez les entreprises.
+            <p className="mt-3 max-w-2xl text-sm text-white/60">
+              Verification des dossiers, pilotage des statuts et controle de la base artisan.
             </p>
           </div>
 
           <div className="flex flex-wrap gap-2">
-            <FilterButton href="/admin" active={!selectedStatus}>
-              Tous
-            </FilterButton>
-            <FilterButton
-              href="/admin?status=PENDING"
-              active={selectedStatus === "PENDING"}
+            <Link
+              href="/api/auth/signout?callbackUrl=/"
+              className="rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-white/75 transition hover:bg-white/10 hover:text-white"
             >
-              PENDING
-            </FilterButton>
-            <FilterButton
-              href="/admin?status=APPROVED"
-              active={selectedStatus === "APPROVED"}
-            >
-              APPROVED
-            </FilterButton>
-            <FilterButton
-              href="/admin?status=REJECTED"
-              active={selectedStatus === "REJECTED"}
-            >
-              REJECTED
-            </FilterButton>
+              Se deconnecter
+            </Link>
           </div>
+        </div>
+
+        <div className="mb-8 grid gap-4 sm:grid-cols-3">
+          <StatCard label="En attente" value={pendingCount} />
+          <StatCard label="Approuves" value={approvedCount} />
+          <StatCard label="Refuses" value={rejectedCount} />
+        </div>
+
+        <div className="mb-6 flex flex-wrap gap-2">
+          <FilterButton href="/admin" active={!selectedStatus}>
+            Tous
+          </FilterButton>
+          <FilterButton href="/admin?status=PENDING" active={selectedStatus === "PENDING"}>
+            PENDING
+          </FilterButton>
+          <FilterButton href="/admin?status=APPROVED" active={selectedStatus === "APPROVED"}>
+            APPROVED
+          </FilterButton>
+          <FilterButton href="/admin?status=REJECTED" active={selectedStatus === "REJECTED"}>
+            REJECTED
+          </FilterButton>
         </div>
 
         <GlassCard className="overflow-hidden">
@@ -93,40 +104,24 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
               <tbody>
                 {companies.length === 0 ? (
                   <tr>
-                    <td
-                      colSpan={6}
-                      className="px-6 py-10 text-center text-sm text-white/50"
-                    >
-                      Aucune entreprise trouvée pour ce filtre.
+                    <td colSpan={6} className="px-6 py-10 text-center text-sm text-white/50">
+                      Aucune entreprise trouvee pour ce filtre.
                     </td>
                   </tr>
                 ) : (
                   companies.map((company) => (
-                    <tr
-                      key={company.id}
-                      className="border-b border-white/5 transition hover:bg-white/[0.025]"
-                    >
-                      <td className="px-6 py-5 font-medium text-white">
-                        {company.legalName}
-                      </td>
-                      <td className="px-6 py-5 text-sm text-white/70">
-                        {company.email}
-                      </td>
+                    <tr key={company.id} className="border-b border-white/5 transition hover:bg-white/[0.025]">
+                      <td className="px-6 py-5 font-medium text-white">{company.legalName}</td>
+                      <td className="px-6 py-5 text-sm text-white/70">{company.email}</td>
                       <td className="px-6 py-5">
                         <StatusBadge status={company.status as CompanyStatus} />
                       </td>
-                      <td className="px-6 py-5 text-sm text-white/70">
-                        {company.city}
-                      </td>
-                      <td className="px-6 py-5 text-sm text-white/70">
-                        {company.siren}
-                      </td>
+                      <td className="px-6 py-5 text-sm text-white/70">{company.city}</td>
+                      <td className="px-6 py-5 text-sm text-white/70">{company.siren}</td>
                       <td className="px-6 py-5">
                         <CompanyStatusActions
                           companyId={company.id}
-                          currentStatus={
-                            company.status as "PENDING" | "APPROVED" | "REJECTED"
-                          }
+                          currentStatus={company.status as "PENDING" | "APPROVED" | "REJECTED"}
                         />
                       </td>
                     </tr>
@@ -138,6 +133,15 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
         </GlassCard>
       </div>
     </main>
+  )
+}
+
+function StatCard({ label, value }: { label: string; value: number }) {
+  return (
+    <GlassCard className="p-6">
+      <p className="text-sm text-white/45">{label}</p>
+      <p className="mt-3 text-3xl font-semibold text-white">{value}</p>
+    </GlassCard>
   )
 }
 
@@ -174,9 +178,7 @@ function StatusBadge({ status }: { status: CompanyStatus }) {
   }
 
   return (
-    <span
-      className={`inline-flex rounded-full border px-3 py-1 text-xs font-medium ${styles[status]}`}
-    >
+    <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-medium ${styles[status]}`}>
       {status}
     </span>
   )
