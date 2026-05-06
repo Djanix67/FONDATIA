@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import { useSearchParams } from "next/navigation"
 import { useState } from "react"
 import { signIn } from "next-auth/react"
 import { useRouter } from "next/navigation"
@@ -8,10 +9,13 @@ import { GlassCard } from "@/components/ui/glass-card"
 
 export default function LoginPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
+
+  const callbackUrl = searchParams.get("callbackUrl")
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -31,7 +35,26 @@ export default function LoginPage() {
         return
       }
 
-      router.push("/admin")
+      if (callbackUrl) {
+        router.push(callbackUrl)
+        router.refresh()
+        return
+      }
+
+      const sessionResponse = await fetch("/api/auth/session")
+      const session = await sessionResponse.json()
+      const role = session?.user?.role
+
+      if (role === "ADMIN") {
+        router.push("/admin")
+      } else if (role === "ARTISAN") {
+        router.push("/artisan")
+      } else if (role === "DONNEUR") {
+        router.push("/donneur-ordre")
+      } else {
+        router.push("/")
+      }
+
       router.refresh()
     } catch {
       setError("Une erreur est survenue lors de la connexion.")
@@ -53,7 +76,7 @@ export default function LoginPage() {
             </h1>
 
             <p className="mt-5 max-w-xl text-base leading-7 text-white/65 sm:text-lg">
-              Le login envoie vers l'espace admin, puis la page decide si le compte peut y acceder. Les comptes non admin sont bloques hors de cette zone.
+              Chaque profil est redirige vers l'espace qui lui correspond : admin, artisan ou donneur d'ordre.
             </p>
           </div>
 
