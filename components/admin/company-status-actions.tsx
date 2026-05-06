@@ -1,71 +1,107 @@
 "use client"
 
-import { useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
+import { useMemo, useState, useTransition } from "react"
 
-type CompanyStatus = "PENDING" | "APPROVED" | "REJECTED"
+type CompanyStatus = "PENDING" | "APPROVED" | "REJECTED" | "BLOCKED"
 
-type Props = {
+type CompanyStatusActionsProps = {
   companyId: string
   currentStatus: CompanyStatus
+  rejectedReason?: string | null
 }
 
-export function CompanyStatusActions({ companyId, currentStatus }: Props) {
+export function CompanyStatusActions({
+  companyId,
+  currentStatus,
+  rejectedReason,
+}: CompanyStatusActionsProps) {
   const router = useRouter()
-  const [error, setError] = useState("")
+  const [status, setStatus] = useState<CompanyStatus>(currentStatus)
+  const [reason, setReason] = useState(rejectedReason ?? "")
+  const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
-  const [loadingAction, setLoadingAction] = useState<"APPROVED" | "REJECTED" | null>(null)
 
-  const updateStatus = (status: "APPROVED" | "REJECTED") => {
-    setError("")
-    setLoadingAction(status)
+  const needsReason = useMemo(() => status === "REJECTED", [status])
+
+  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setError(null)
+    setSuccess(null)
 
     startTransition(async () => {
-      try {
-        const res = await fetch(`/api/admin/companies/${companyId}/status`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ status }),
-        })
+      const response = await fetch(`/api/admin/companies/${companyId}/status`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          status,
+          rejectedReason: needsReason ? reason : undefined,
+        }),
+      })
 
-        const data = await res.json()
+      const payload = (await response.json().catch(() => null)) as
+        | { error?: string }
+        | null
 
-        if (!res.ok) {
-          throw new Error(data?.error || "Erreur inconnue")
-        }
-
-        router.refresh()
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Une erreur est survenue")
-      } finally {
-        setLoadingAction(null)
+      if (!response.ok) {
+        setError(payload?.error ?? "Impossible de mettre a jour le dossier.")
+        return
       }
+
+      setSuccess("Statut mis a jour.")
+      router.refresh()
     })
   }
 
   return (
-    <div className="flex flex-col gap-2">
-      <div className="flex flex-wrap gap-2">
-        <button
-          type="button"
-          onClick={() => updateStatus("APPROVED")}
-          disabled={isPending || currentStatus === "APPROVED"}
-          className="rounded-2xl border border-emerald-400/20 bg-emerald-400/10 px-3 py-2 text-sm font-medium text-emerald-200 transition hover:bg-emerald-400/20 disabled:cursor-not-allowed disabled:opacity-50"
+    <form className="space-y-3" onSubmit={handleSubmit}>
+      <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
+        <select
+          value={status}
+          onChange={(event) => setStatus(event.target.value as CompanyStatus)}
+          className="rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm text-white outline-none transition focus:border-sky-300/60"
+          disabled={isPending}
         >
-          {loadingAction === "APPROVED" ? "Validation..." : "Valider"}
-        </button>
+          <option value="PENDING">PENDING</option>
+          <option value="APPROVED">APPROVED</option>
+          <option value="REJECTED">REJECTED</option>
+          <option value="BLOCKED">BLOCKED</option>
+        </select>
 
         <button
-          type="button"
-          onClick={() => updateStatus("REJECTED")}
-          disabled={isPending || currentStatus === "REJECTED"}
-          className="rounded-2xl border border-red-400/20 bg-red-400/10 px-3 py-2 text-sm font-medium text-red-200 transition hover:bg-red-400/20 disabled:cursor-not-allowed disabled:opacity-50"
+          type="submit"
+          disabled={isPending}
+          className="rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-sm font-medium text-white transition hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {loadingAction === "REJECTED" ? "Refus..." : "Refuser"}
+          {isPending ? "Mise a jour..." : "Mettre a jour"}
         </button>
       </div>
 
-      {error ? <p className="text-xs text-red-300">{error}</p> : null}
-    </div>
+      {needsReason ? (
+        <textarea
+          value={reason}
+          onChange={(event) => setReason(event.target.value)}
+          rows={3}
+          placeholder="Motif de refus interne ou communique a l'artisan"
+          className="w-full rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm text-white outline-none transition placeholder:text-white/30 focus:border-sky-300/60"
+          disabled={isPending}
+        />
+      ) : null}
+
+      {error ? (
+        <p className="rounded-2xl border border-rose-400/20 bg-rose-400/10 px-4 py-3 text-sm text-rose-100">
+          {error}
+        </p>
+      ) : null}
+
+      {success ? (
+        <p className="rounded-2xl border border-emerald-400/20 bg-emerald-400/10 px-4 py-3 text-sm text-emerald-100">
+          {success}
+        </p>
+      ) : null}
+    </form>
   )
 }
