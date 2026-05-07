@@ -301,7 +301,6 @@ export default function InscriptionArtisanPage() {
               <h2 className="text-2xl font-semibold tracking-tight text-white">
                 INSCRIPTION
               </h2>
-              <p className="mt-2 text-xs text-white/60">{passwordHint}</p>
             </div>
 
             <form onSubmit={onSubmit} className="space-y-8">
