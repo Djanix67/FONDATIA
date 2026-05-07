@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma"
 import { artisanRegisterSchema } from "@/lib/validations/artisan-register"
 import { sendTransactionalEmail } from "@/lib/email"
 import { applicationReceivedTemplate } from "@/emails/templates"
+import { sendEmailVerification } from "@/lib/email-verification"
 
 export async function POST(req: Request) {
   try {
@@ -125,11 +126,14 @@ export async function POST(req: Request) {
     if (profileType === "ARTISAN") {
       const template = applicationReceivedTemplate(legalName)
 
-      await sendTransactionalEmail({
-        to: normalizedEmail,
-        subject: template.subject,
-        html: template.html,
-      }).catch(() => null)
+      await Promise.allSettled([
+        sendTransactionalEmail({
+          to: normalizedEmail,
+          subject: template.subject,
+          html: template.html,
+        }),
+        sendEmailVerification(normalizedEmail),
+      ])
     }
 
     return NextResponse.json(
@@ -139,7 +143,7 @@ export async function POST(req: Request) {
         companyId: user.company?.id,
         redirectTo:
           profileType === "ARTISAN"
-            ? "/validation-en-attente"
+            ? `/validation-en-attente?email=${encodeURIComponent(normalizedEmail)}`
             : "/login?callbackUrl=/donneur-ordre",
       },
       { status: 201 }
