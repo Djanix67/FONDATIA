@@ -39,7 +39,10 @@ export async function POST(request: Request) {
       url: upload.url,
     })
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Upload impossible."
+    const message =
+      error instanceof Error && error.message
+        ? error.message
+        : "Upload impossible."
 
     return NextResponse.json({ error: message }, { status: 400 })
   }
