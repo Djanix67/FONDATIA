@@ -13,7 +13,7 @@ export async function POST(req: Request) {
     if (!parsed.success) {
       return NextResponse.json(
         {
-          error: "Donnees invalides",
+          error: "Merci de corriger les champs encadres en rouge.",
           details: parsed.error.flatten(),
         },
         { status: 400 }
@@ -28,7 +28,6 @@ export async function POST(req: Request) {
       profileType,
       legalName,
       siren,
-      siret,
       address,
       postalCode,
       city,
@@ -47,23 +46,44 @@ export async function POST(req: Request) {
 
     if (existingUser) {
       return NextResponse.json(
-        { error: "Un compte existe deja avec cet email." },
+        {
+          error: "Merci de corriger les champs encadres en rouge.",
+          details: {
+            fieldErrors: {
+              email: ["Un compte existe deja avec cet email."],
+            },
+          },
+        },
         { status: 409 }
       )
     }
 
     const existingCompany = await prisma.company.findFirst({
       where: {
-        OR: [{ email: normalizedEmail }, { phone }, { siren }, { siret }],
+        OR: [{ email: normalizedEmail }, { phone }, { siren }],
       },
-      select: { id: true },
+      select: { email: true, phone: true, siren: true },
     })
 
     if (existingCompany) {
+      const fieldErrors: Record<string, string[]> = {}
+
+      if (existingCompany.email === normalizedEmail) {
+        fieldErrors.email = ["Une entreprise existe deja avec cet email."]
+      }
+
+      if (existingCompany.phone === phone) {
+        fieldErrors.phone = ["Une entreprise existe deja avec ce numero de telephone."]
+      }
+
+      if (existingCompany.siren === siren) {
+        fieldErrors.siren = ["Une entreprise existe deja avec ce SIREN."]
+      }
+
       return NextResponse.json(
         {
-          error:
-            "Une entreprise existe deja avec cet email, telephone, SIREN ou SIRET.",
+          error: "Merci de corriger les champs encadres en rouge.",
+          details: { fieldErrors },
         },
         { status: 409 }
       )
@@ -85,7 +105,7 @@ export async function POST(req: Request) {
             email: normalizedEmail,
             phone,
             siren,
-            siret,
+            siret: null,
             address,
             postalCode,
             city,
