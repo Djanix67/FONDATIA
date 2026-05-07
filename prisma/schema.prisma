@@ -28,7 +28,7 @@ model Company {
   userId                String        @unique
   legalName             String
   siren                 String        @unique
-  siret                 String        @unique
+  siret                 String?       @unique
   email                 String        @unique
   phone                 String        @unique
   postalCode            String
