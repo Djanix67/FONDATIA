@@ -31,12 +31,22 @@ const allowedMimeTypes = new Set([
 
 const maxUploadSize = 10 * 1024 * 1024
 
+function resolveSupabaseUrl() {
+  return process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL
+}
+
 export function getStorageConfig() {
-  return storageConfigSchema.parse({
-    supabaseUrl: process.env.SUPABASE_URL,
-    serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
-    bucket: process.env.SUPABASE_STORAGE_BUCKET ?? "company-documents",
-  })
+  try {
+    return storageConfigSchema.parse({
+      supabaseUrl: resolveSupabaseUrl(),
+      serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
+      bucket: process.env.SUPABASE_STORAGE_BUCKET ?? "company-documents",
+    })
+  } catch {
+    throw new Error(
+      "Configuration Supabase manquante. Ajoutez SUPABASE_URL ou NEXT_PUBLIC_SUPABASE_URL, ainsi que SUPABASE_SERVICE_ROLE_KEY dans le .env."
+    )
+  }
 }
 
 function sanitizeFileName(fileName: string) {
