@@ -30,7 +30,11 @@ export default function LoginPage() {
       })
 
       if (!result || result.error) {
-        setError("Email ou mot de passe incorrect.")
+        if (result?.error === "EmailNotVerified") {
+          setError("Merci de confirmer votre adresse email avant de vous connecter.")
+        } else {
+          setError("Email ou mot de passe incorrect.")
+        }
         setLoading(false)
         return
       }
