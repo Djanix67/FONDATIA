@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { GlassCard } from "@/components/ui/glass-card"
 
@@ -10,11 +10,26 @@ type DocumentFieldName =
   | "identityCardFrontUrl"
   | "identityCardBackUrl"
 
+type FormFieldName =
+  | "name"
+  | "email"
+  | "password"
+  | "phone"
+  | "profileType"
+  | "legalName"
+  | "siren"
+  | "address"
+  | "postalCode"
+  | "city"
+  | DocumentFieldName
+
 type UploadState = {
   isUploading: boolean
   fileName: string
   error: string
 }
+
+type FieldErrors = Partial<Record<FormFieldName, string>>
 
 const initialForm = {
   name: "",
@@ -24,7 +39,6 @@ const initialForm = {
   profileType: "ARTISAN",
   legalName: "",
   siren: "",
-  siret: "",
   address: "",
   postalCode: "",
   city: "",
@@ -45,33 +59,31 @@ const documentConfigs: Array<{
   field: DocumentFieldName
   documentType: "kbis" | "insuranceDecennale" | "identityCardFront" | "identityCardBack"
   label: string
-  description: string
 }> = [
   {
     field: "kbisUrl",
     documentType: "kbis",
     label: "KBIS",
-    description: "PDF ou image nette du document officiel.",
   },
   {
     field: "insuranceDecennaleUrl",
     documentType: "insuranceDecennale",
     label: "Attestation decennale",
-    description: "Attestation en cours de validite au format PDF ou image.",
   },
   {
     field: "identityCardFrontUrl",
     documentType: "identityCardFront",
     label: "Carte d'identite recto",
-    description: "Recto lisible de la piece d'identite du gerant.",
   },
   {
     field: "identityCardBackUrl",
     documentType: "identityCardBack",
     label: "Carte d'identite verso",
-    description: "Verso lisible de la piece d'identite du gerant.",
   },
 ]
+
+const passwordHint =
+  "8 caracteres minimum, avec 1 majuscule, 1 minuscule, 1 chiffre et 1 caractere special."
 
 export default function InscriptionArtisanPage() {
   const router = useRouter()
@@ -80,9 +92,17 @@ export default function InscriptionArtisanPage() {
   const [draftId, setDraftId] = useState("")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
+
+  const uploadsInFlight = useMemo(
+    () => Object.values(uploadState).some((item) => item.isUploading),
+    [uploadState]
+  )
 
   const updateField = (key: keyof typeof initialForm, value: string) => {
     setForm((prev) => ({ ...prev, [key]: value }))
+    setFieldErrors((prev) => ({ ...prev, [key]: undefined }))
+    setError("")
   }
 
   const updateUploadState = (field: DocumentFieldName, next: Partial<UploadState>) => {
@@ -95,12 +115,68 @@ export default function InscriptionArtisanPage() {
     }))
   }
 
+  const applyFieldErrors = (nextErrors: FieldErrors) => {
+    setFieldErrors(nextErrors)
+    setError(Object.keys(nextErrors).length > 0 ? "Merci de corriger les champs encadres en rouge." : "")
+  }
+
+  const validateForm = () => {
+    const nextErrors: FieldErrors = {}
+
+    if (form.name.trim().length < 2) {
+      nextErrors.name = "Le nom et prenom du gerant sont requis."
+    }
+
+    if (!form.email.trim()) {
+      nextErrors.email = "L'email est requis."
+    } else if (!form.email.includes("@")) {
+      nextErrors.email = "L'email doit contenir un @."
+    }
+
+    if (!/^(06|07)\d{8}$/.test(form.phone)) {
+      nextErrors.phone = "Le numero doit commencer par 06 ou 07 et contenir 10 chiffres."
+    }
+
+    if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/.test(form.password)) {
+      nextErrors.password = passwordHint
+    }
+
+    if (form.legalName.trim().length < 2) {
+      nextErrors.legalName = "La raison sociale est requise."
+    }
+
+    if (!/^\d{9}$/.test(form.siren)) {
+      nextErrors.siren = "Le SIREN doit contenir 9 chiffres."
+    }
+
+    if (form.address.trim().length < 3) {
+      nextErrors.address = "L'adresse est requise."
+    }
+
+    if (form.postalCode.trim().length < 4) {
+      nextErrors.postalCode = "Le code postal est requis."
+    }
+
+    if (form.city.trim().length < 2) {
+      nextErrors.city = "La ville est requise."
+    }
+
+    for (const document of documentConfigs) {
+      if (!form[document.field]) {
+        nextErrors[document.field] = `Merci de telecharger ${document.label.toLowerCase()}.`
+      }
+    }
+
+    return nextErrors
+  }
+
   const handleDocumentUpload = async (
     field: DocumentFieldName,
     documentType: "kbis" | "insuranceDecennale" | "identityCardFront" | "identityCardBack",
     file: File
   ) => {
     setError("")
+    setFieldErrors((prev) => ({ ...prev, [field]: undefined }))
     updateUploadState(field, {
       isUploading: true,
       error: "",
@@ -138,10 +214,12 @@ export default function InscriptionArtisanPage() {
         fileName: file.name,
       })
     } catch (err) {
+      const message = err instanceof Error ? err.message : "Upload impossible"
       updateField(field, "")
+      setFieldErrors((prev) => ({ ...prev, [field]: message }))
       updateUploadState(field, {
         isUploading: false,
-        error: err instanceof Error ? err.message : "Upload impossible",
+        error: message,
       })
     }
   }
@@ -150,6 +228,14 @@ export default function InscriptionArtisanPage() {
     e.preventDefault()
     setLoading(true)
     setError("")
+
+    const nextErrors = validateForm()
+
+    if (Object.keys(nextErrors).length > 0) {
+      applyFieldErrors(nextErrors)
+      setLoading(false)
+      return
+    }
 
     try {
       const res = await fetch("/api/artisans/register", {
@@ -163,18 +249,33 @@ export default function InscriptionArtisanPage() {
       const data = await res.json()
 
       if (!res.ok) {
-        throw new Error(data?.error || "Une erreur est survenue")
+        const apiFieldErrors =
+          (data?.details?.fieldErrors as Record<string, string[] | undefined> | undefined) ?? {}
+
+        const normalizedErrors: FieldErrors = {}
+
+        for (const [key, value] of Object.entries(apiFieldErrors)) {
+          if (value?.[0]) {
+            normalizedErrors[key as FormFieldName] = value[0]
+          }
+        }
+
+        if (Object.keys(normalizedErrors).length > 0) {
+          applyFieldErrors(normalizedErrors)
+        } else {
+          setError(data?.error || "Une erreur est survenue pendant l'inscription.")
+        }
+
+        return
       }
 
       router.push(data?.redirectTo ?? "/validation-en-attente")
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Une erreur est survenue")
+      setError(err instanceof Error ? err.message : "Une erreur est survenue pendant l'inscription.")
     } finally {
       setLoading(false)
     }
   }
-
-  const uploadsInFlight = Object.values(uploadState).some((item) => item.isUploading)
 
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top,rgba(38,99,235,0.14),transparent_28%),linear-gradient(180deg,#030712_0%,#06111f_40%,#020617_100%)] text-white">
@@ -200,9 +301,7 @@ export default function InscriptionArtisanPage() {
               <h2 className="text-2xl font-semibold tracking-tight text-white">
                 INSCRIPTION
               </h2>
-              <p className="mt-2 text-sm text-white/60">
-                Le mot de passe doit contenir au minimum 8 caracteres, une majuscule, une minuscule et un caractere special.
-              </p>
+              <p className="mt-2 text-xs text-white/60">{passwordHint}</p>
             </div>
 
             <form onSubmit={onSubmit} className="space-y-8">
@@ -218,6 +317,7 @@ export default function InscriptionArtisanPage() {
                       value={form.name}
                       onChange={(value) => updateField("name", value)}
                       placeholder="Jean Dupont"
+                      error={fieldErrors.name}
                     />
                   </div>
                   <Field
@@ -226,12 +326,15 @@ export default function InscriptionArtisanPage() {
                     value={form.email}
                     onChange={(value) => updateField("email", value)}
                     placeholder="jean@exemple.fr"
+                    error={fieldErrors.email}
                   />
                   <Field
                     label="Telephone"
                     value={form.phone}
-                    onChange={(value) => updateField("phone", value)}
+                    onChange={(value) => updateField("phone", value.replace(/\D/g, "").slice(0, 10))}
                     placeholder="06 00 00 00 00"
+                    error={fieldErrors.phone}
+                    inputMode="numeric"
                   />
                   <div className="sm:col-span-2">
                     <Field
@@ -240,6 +343,8 @@ export default function InscriptionArtisanPage() {
                       value={form.password}
                       onChange={(value) => updateField("password", value)}
                       placeholder="••••••••"
+                      error={fieldErrors.password}
+                      helperText={passwordHint}
                     />
                   </div>
                 </div>
@@ -263,21 +368,20 @@ export default function InscriptionArtisanPage() {
                         value={form.legalName}
                         onChange={(value) => updateField("legalName", value)}
                         placeholder="Dupont Construction"
+                        error={fieldErrors.legalName}
                       />
                     </div>
 
-                    <Field
-                      label="SIREN"
-                      value={form.siren}
-                      onChange={(value) => updateField("siren", value.replace(/\D/g, "").slice(0, 9))}
-                      placeholder="123456789"
-                    />
-                    <Field
-                      label="SIRET"
-                      value={form.siret}
-                      onChange={(value) => updateField("siret", value.replace(/\D/g, "").slice(0, 14))}
-                      placeholder="12345678900012"
-                    />
+                    <div className="sm:col-span-2">
+                      <Field
+                        label="SIREN"
+                        value={form.siren}
+                        onChange={(value) => updateField("siren", value.replace(/\D/g, "").slice(0, 9))}
+                        placeholder="123456789"
+                        error={fieldErrors.siren}
+                        inputMode="numeric"
+                      />
+                    </div>
 
                     <div className="sm:col-span-2">
                       <Field
@@ -285,6 +389,7 @@ export default function InscriptionArtisanPage() {
                         value={form.address}
                         onChange={(value) => updateField("address", value)}
                         placeholder="12 rue des Artisans"
+                        error={fieldErrors.address}
                       />
                     </div>
 
@@ -293,12 +398,15 @@ export default function InscriptionArtisanPage() {
                       value={form.postalCode}
                       onChange={(value) => updateField("postalCode", value)}
                       placeholder="67000"
+                      error={fieldErrors.postalCode}
+                      inputMode="numeric"
                     />
                     <Field
                       label="Ville"
                       value={form.city}
                       onChange={(value) => updateField("city", value)}
                       placeholder="Strasbourg"
+                      error={fieldErrors.city}
                     />
                   </div>
                 </div>
@@ -308,15 +416,17 @@ export default function InscriptionArtisanPage() {
                 <p className="text-xs uppercase tracking-[0.2em] text-white/40">
                   Documents obligatoires
                 </p>
+                <p className="text-sm leading-6 text-white/65">
+                  Merci de telecharger votre KBIS, votre carte d'identite recto/verso et votre attestation decennale.
+                </p>
                 <div className="grid gap-4 sm:grid-cols-2">
                   {documentConfigs.map((document) => (
                     <DocumentUploadField
                       key={document.field}
                       label={document.label}
-                      description={document.description}
                       isUploading={uploadState[document.field].isUploading}
                       fileName={uploadState[document.field].fileName}
-                      error={uploadState[document.field].error}
+                      error={fieldErrors[document.field] || uploadState[document.field].error}
                       isUploaded={Boolean(form[document.field])}
                       onFileSelect={(file) =>
                         handleDocumentUpload(document.field, document.documentType, file)
@@ -356,6 +466,9 @@ type FieldProps = {
   onChange: (value: string) => void
   placeholder?: string
   type?: string
+  error?: string
+  helperText?: string
+  inputMode?: React.HTMLAttributes<HTMLInputElement>["inputMode"]
 }
 
 function Field({
@@ -364,6 +477,9 @@ function Field({
   onChange,
   placeholder,
   type = "text",
+  error,
+  helperText,
+  inputMode,
 }: FieldProps) {
   return (
     <label className="block">
@@ -373,15 +489,22 @@ function Field({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="h-12 w-full rounded-2xl border border-white/10 bg-white/5 px-4 text-sm text-white outline-none transition placeholder:text-white/25 focus:border-white/20 focus:bg-white/[0.07]"
+        inputMode={inputMode}
+        className={[
+          "h-12 w-full rounded-2xl border bg-white/5 px-4 text-sm text-white outline-none transition placeholder:text-white/25 focus:bg-white/[0.07]",
+          error
+            ? "border-red-400/70 focus:border-red-400"
+            : "border-white/10 focus:border-white/20",
+        ].join(" ")}
       />
+      {helperText ? <p className="mt-2 text-xs leading-5 text-white/45">{helperText}</p> : null}
+      {error ? <p className="mt-2 text-xs leading-5 text-red-200">{error}</p> : null}
     </label>
   )
 }
 
 function DocumentUploadField({
   label,
-  description,
   isUploading,
   fileName,
   error,
@@ -389,36 +512,41 @@ function DocumentUploadField({
   onFileSelect,
 }: {
   label: string
-  description: string
   isUploading: boolean
   fileName: string
-  error: string
+  error?: string
   isUploaded: boolean
   onFileSelect: (file: File) => void
 }) {
   return (
-    <label className="block rounded-2xl border border-white/10 bg-white/5 p-4 transition hover:bg-white/[0.07]">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-sm font-medium text-white">{label}</p>
-          <p className="mt-2 text-xs leading-6 text-white/50">{description}</p>
+    <label
+      className={[
+        "block cursor-pointer rounded-2xl border p-4 transition",
+        error
+          ? "border-red-400/70 bg-red-400/10"
+          : "border-white/10 bg-white/5 hover:bg-white/[0.07]",
+      ].join(" ")}
+    >
+      <div className="flex items-center gap-4">
+        <div className="flex h-12 w-12 items-center justify-center rounded-full border border-white/15 bg-white/10 text-2xl text-white">
+          +
         </div>
-        <span
-          className={[
-            "rounded-full px-3 py-1 text-xs font-medium",
-            isUploaded
-              ? "border border-emerald-300/20 bg-emerald-300/10 text-emerald-100"
-              : "border border-white/10 bg-white/5 text-white/55",
-          ].join(" ")}
-        >
-          {isUploading ? "Upload..." : isUploaded ? "Recu" : "A fournir"}
-        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium text-white">{label}</p>
+          <p className="mt-1 text-xs text-white/50">
+            {isUploading
+              ? "Televersement en cours..."
+              : isUploaded
+                ? fileName || "Document telecharge"
+                : "Cliquez pour choisir un fichier ou une photo"}
+          </p>
+        </div>
       </div>
 
       <input
         type="file"
         accept=".pdf,image/png,image/jpeg,image/webp"
-        className="mt-4 block w-full text-sm text-white file:mr-4 file:rounded-full file:border file:border-white/10 file:bg-white/10 file:px-4 file:py-2 file:text-sm file:font-medium file:text-white file:transition hover:file:bg-white/15"
+        className="sr-only"
         onChange={(event) => {
           const file = event.target.files?.[0]
           if (file) {
@@ -427,8 +555,7 @@ function DocumentUploadField({
         }}
       />
 
-      {fileName ? <p className="mt-3 text-xs text-white/55">{fileName}</p> : null}
-      {error ? <p className="mt-2 text-xs text-rose-200">{error}</p> : null}
+      {error ? <p className="mt-3 text-xs leading-5 text-red-200">{error}</p> : null}
     </label>
   )
 }
