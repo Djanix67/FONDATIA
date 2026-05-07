@@ -12,6 +12,25 @@ export function applicationReceivedTemplate(legalName: string) {
   }
 }
 
+export function emailVerificationTemplate(verificationUrl: string) {
+  return {
+    subject: "FONDATIA - confirmez votre adresse email",
+    html: `
+      <div style="font-family: Arial, sans-serif; color: #101828; line-height: 1.6;">
+        <h1>FONDATIA</h1>
+        <p>Bonjour,</p>
+        <p>Merci de confirmer votre adresse email pour finaliser l'activation de votre dossier.</p>
+        <p>
+          <a href="${verificationUrl}" style="display:inline-block;padding:12px 18px;border-radius:999px;background:#102a56;color:#ffffff;text-decoration:none;font-weight:600;">
+            Confirmer mon email
+          </a>
+        </p>
+        <p>Si le bouton ne fonctionne pas, utilisez ce lien : ${verificationUrl}</p>
+      </div>
+    `,
+  }
+}
+
 export function applicationApprovedTemplate(legalName: string) {
   return {
     subject: "FONDATIA - dossier valide",
