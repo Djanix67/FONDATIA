@@ -8,6 +8,16 @@ type ValidationEnAttentePageProps = {
 export default async function ValidationEnAttentePage({ searchParams }: ValidationEnAttentePageProps) {
   const params = (await searchParams) ?? {}
   const email = typeof params.email === "string" ? params.email : null
+  const profileType = typeof params.profileType === "string" ? params.profileType : "ARTISAN"
+  const isDonneur = profileType === "DONNEUR"
+
+  const title = isDonneur
+    ? "Verifiez votre email pour activer votre acces"
+    : "Verifiez votre email pour finaliser le dossier"
+
+  const description = isDonneur
+    ? `Nous vous avons envoye un lien de confirmation${email ? ` a ${email}` : ""}. Une fois l'email confirme, vous pourrez vous connecter a votre espace donneur d'ordre FONDATIA.`
+    : `Nous vous avons envoye un lien de confirmation${email ? ` a ${email}` : ""}. Une fois l'email confirme, votre dossier artisan restera en attente de validation par l'equipe FONDATIA.`
 
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top,rgba(38,99,235,0.14),transparent_28%),linear-gradient(180deg,#030712_0%,#06111f_40%,#020617_100%)] text-white">
@@ -18,12 +28,11 @@ export default async function ValidationEnAttentePage({ searchParams }: Validati
           </div>
 
           <h1 className="mt-6 text-center text-3xl font-semibold tracking-tight text-white">
-            Verifiez votre email pour finaliser le dossier
+            {title}
           </h1>
 
           <p className="mx-auto mt-4 max-w-xl text-center text-base leading-7 text-white/65">
-            Nous vous avons envoye un lien de confirmation{email ? ` a ${email}` : ""}. Une fois l'email confirme,
-            votre dossier artisan restera en attente de validation par l'equipe FONDATIA.
+            {description}
           </p>
 
           <div className="mt-8 rounded-2xl border border-white/10 bg-slate-950/40 px-4 py-4 text-sm text-slate-200">
