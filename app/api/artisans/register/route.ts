@@ -123,7 +123,7 @@ export async function POST(req: Request) {
       },
     })
 
-    const sideEffects = [sendEmailVerification(normalizedEmail)]
+    const sideEffects: Promise<unknown>[] = [sendEmailVerification(normalizedEmail)]
 
     if (profileType === "ARTISAN") {
       const template = applicationReceivedTemplate(legalName)
