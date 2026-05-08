@@ -123,28 +123,28 @@ export async function POST(req: Request) {
       },
     })
 
+    const sideEffects = [sendEmailVerification(normalizedEmail)]
+
     if (profileType === "ARTISAN") {
       const template = applicationReceivedTemplate(legalName)
 
-      await Promise.allSettled([
+      sideEffects.push(
         sendTransactionalEmail({
           to: normalizedEmail,
           subject: template.subject,
           html: template.html,
-        }),
-        sendEmailVerification(normalizedEmail),
-      ])
+        })
+      )
     }
+
+    await Promise.allSettled(sideEffects)
 
     return NextResponse.json(
       {
         success: true,
         userId: user.id,
         companyId: user.company?.id,
-        redirectTo:
-          profileType === "ARTISAN"
-            ? `/validation-en-attente?email=${encodeURIComponent(normalizedEmail)}`
-            : "/login?callbackUrl=/donneur-ordre",
+        redirectTo: `/validation-en-attente?email=${encodeURIComponent(normalizedEmail)}&profileType=${profileType}`,
       },
       { status: 201 }
     )
