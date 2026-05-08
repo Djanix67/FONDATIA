@@ -12,28 +12,29 @@ async function main() {
     throw new Error("ADMIN_EMAIL and ADMIN_PASSWORD are required in .env");
   }
 
-  const existing = await prisma.user.findUnique({
-    where: { email: email.toLowerCase() },
-  });
-
-  if (existing) {
-    console.log(`Admin already exists: ${existing.email}`);
-    return;
-  }
-
+  const normalizedEmail = email.toLowerCase();
   const passwordHash = await hash(password, 12);
 
-  const admin = await prisma.user.create({
-    data: {
+  const admin = await prisma.user.upsert({
+    where: { email: normalizedEmail },
+    update: {
       name,
-      email: email.toLowerCase(),
       passwordHash,
       role: UserRole.ADMIN,
       companyStatus: CompanyStatus.APPROVED,
+      emailVerified: new Date(),
+    },
+    create: {
+      name,
+      email: normalizedEmail,
+      passwordHash,
+      role: UserRole.ADMIN,
+      companyStatus: CompanyStatus.APPROVED,
+      emailVerified: new Date(),
     },
   });
 
-  console.log(`Admin created: ${admin.email}`);
+  console.log(`Admin ready: ${admin.email}`);
 }
 
 main()
@@ -44,4 +45,3 @@ main()
   .finally(async () => {
     await prisma.$disconnect();
   });
-
