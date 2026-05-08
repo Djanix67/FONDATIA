@@ -59,6 +59,11 @@ export async function verifyEmailToken(token: string) {
     return { ok: false, reason: "expired" as const }
   }
 
+  const user = await prisma.user.findUnique({
+    where: { email: verificationToken.identifier },
+    select: { role: true },
+  })
+
   await prisma.$transaction([
     prisma.user.update({
       where: { email: verificationToken.identifier },
@@ -69,5 +74,5 @@ export async function verifyEmailToken(token: string) {
     }),
   ])
 
-  return { ok: true as const }
+  return { ok: true as const, role: user?.role ?? null }
 }
