@@ -19,11 +19,17 @@ export default async function VerificationEmailPage({ searchParams }: Verificati
 
   const content =
     result.ok
-      ? {
-          title: "Adresse email confirmee",
-          description:
-            "Votre email est maintenant verifie. Vous pouvez vous connecter pour suivre votre dossier artisan.",
-        }
+      ? result.role === "DONNEUR"
+        ? {
+            title: "Adresse email confirmee",
+            description:
+              "Votre email est maintenant verifie. Vous pouvez vous connecter pour acceder a votre espace donneur d'ordre.",
+          }
+        : {
+            title: "Adresse email confirmee",
+            description:
+              "Votre email est maintenant verifie. Vous pouvez vous connecter pour suivre votre dossier artisan.",
+          }
       : result.reason === "expired"
         ? {
             title: "Lien expire",
