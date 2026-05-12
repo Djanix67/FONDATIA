@@ -1150,7 +1150,7 @@ function InlineBadge({
   tone,
 }: {
   children: React.ReactNode
-  tone: "default" | "amber" | "rose" | "emerald" | "sky"
+  tone: "default" | "amber" | "rose" | "emerald" | "sky" | "slate"
 }) {
   const styles = {
     default: "border-white/10 bg-white/5 text-slate-200",
@@ -1158,6 +1158,7 @@ function InlineBadge({
     rose: "border-rose-300/20 bg-rose-300/10 text-rose-50",
     emerald: "border-emerald-300/20 bg-emerald-300/10 text-emerald-50",
     sky: "border-sky-300/20 bg-sky-300/10 text-sky-50",
+    slate: "border-slate-300/20 bg-slate-300/10 text-slate-100",
   }
 
   return <span className={`rounded-full border px-3 py-1 text-xs font-medium ${styles[tone]}`}>{children}</span>
@@ -1224,7 +1225,7 @@ function marketStatusLabel(status: MarketStatus) {
   }
 }
 
-function marketTone(status: MarketStatus): "amber" | "emerald" | "rose" | "slate" | "sky" | "default" {
+function marketTone(status: MarketStatus): "amber" | "emerald" | "rose" | "slate" {
   switch (status) {
     case "PENDING_REVIEW":
       return "amber"
