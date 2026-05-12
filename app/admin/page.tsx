@@ -1,12 +1,15 @@
 import Link from "next/link"
+import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { GlassCard } from "@/components/ui/glass-card"
 import { CompanyStatusActions } from "@/components/admin/company-status-actions"
+import { marketAdminStatusSchema } from "@/lib/validations/artisan-register"
 
 type CompanyStatus = "PENDING" | "APPROVED" | "REJECTED" | "BLOCKED"
+type MarketStatus = "PENDING_REVIEW" | "LIVE" | "REJECTED" | "ARCHIVED"
 type AdminTab =
   | "overview"
   | "dossiers"
@@ -25,6 +28,7 @@ type AdminPageProps = {
 
 type CompanyWithUser = Awaited<ReturnType<typeof getArtisanCompanies>>[number]
 type DonorCompany = Awaited<ReturnType<typeof getDonorCompanies>>[number]
+type MarketWithOwner = Awaited<ReturnType<typeof getMarketsByStatus>>[number]
 
 const tabs: Array<{ id: AdminTab; label: string; eyebrow: string }> = [
   { id: "overview", label: "Vue d'ensemble", eyebrow: "Synthese" },
@@ -49,6 +53,63 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     redirect("/acces-interdit")
   }
 
+  async function updateMarketStatusAction(formData: FormData) {
+    "use server"
+
+    const session = await getServerSession(authOptions)
+
+    if (!session?.user || (session.user as { role?: string }).role !== "ADMIN") {
+      redirect("/login?callbackUrl=/admin")
+    }
+
+    const marketId = String(formData.get("marketId") ?? "")
+
+    if (!marketId) {
+      return
+    }
+
+    const parsed = marketAdminStatusSchema.safeParse({
+      status: String(formData.get("status") ?? ""),
+      adminNotes: normalizeString(formData.get("adminNotes")),
+      rejectionReason: normalizeString(formData.get("rejectionReason")),
+    })
+
+    if (!parsed.success) {
+      revalidatePath("/admin")
+      return
+    }
+
+    const existingMarket = await prisma.market.findUnique({
+      where: { id: marketId },
+      select: { publishedAt: true },
+    })
+
+    if (!existingMarket) {
+      revalidatePath("/admin")
+      return
+    }
+
+    const nextStatus = parsed.data.status as MarketStatus
+
+    await prisma.market.update({
+      where: { id: marketId },
+      data: {
+        status: nextStatus,
+        adminNotes: parsed.data.adminNotes ?? null,
+        rejectionReason: nextStatus === "REJECTED" ? parsed.data.rejectionReason ?? null : null,
+        publishedAt:
+          nextStatus === "LIVE"
+            ? existingMarket.publishedAt ?? new Date()
+            : nextStatus === "PENDING_REVIEW"
+              ? null
+              : existingMarket.publishedAt,
+      },
+    })
+
+    revalidatePath("/admin")
+    revalidatePath("/donneur-ordre")
+  }
+
   const params = await searchParams
   const selectedStatus = params.status
   const selectedTab = tabs.some((tab) => tab.id === params.tab) ? (params.tab as AdminTab) : "overview"
@@ -63,6 +124,10 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     rejectedCount,
     blockedCount,
     donorCount,
+    liveMarkets,
+    reviewMarkets,
+    rejectedMarkets,
+    marketTotal,
   ] = await Promise.all([
     getArtisanCompanies(selectedStatus),
     prisma.company.findMany({
@@ -90,6 +155,10 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     prisma.company.count({ where: { user: { role: "ARTISAN" }, status: "REJECTED" } }),
     prisma.company.count({ where: { user: { role: "ARTISAN" }, status: "BLOCKED" } }),
     prisma.user.count({ where: { role: "DONNEUR" } }),
+    getMarketsByStatus("LIVE"),
+    getMarketsByStatus("PENDING_REVIEW"),
+    getMarketsByStatus("REJECTED"),
+    prisma.market.count(),
   ])
 
   const moderationThreads = buildModerationThreads(artisanCompanies, donorCompanies)
@@ -99,10 +168,10 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     rejectedCount,
     donorCount,
     moderationCount: moderationThreads.length,
+    liveMarketCount: liveMarkets.length,
+    reviewMarketCount: reviewMarkets.length,
   })
   const onlineArtisans = buildOnlineArtisans(recentApprovedArtisans)
-  const liveMarkets = buildLiveMarkets(donorCompanies)
-  const reviewMarkets = buildReviewMarkets(donorCompanies)
   const latestArtisans = artisanCompanies.slice(0, 4)
 
   return (
@@ -169,20 +238,22 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                 </p>
               </div>
 
-              <div className="grid min-w-full gap-3 sm:grid-cols-3 xl:min-w-[520px]">
+              <div className="grid min-w-full gap-3 sm:grid-cols-4 xl:min-w-[700px]">
                 <HeroMetric label="Artisans suivis" value={artisanTotal} tone="default" />
                 <HeroMetric label="Donneurs actifs" value={donorCount} tone="sky" />
-                <HeroMetric label="Messages a surveiller" value={moderationThreads.length} tone="amber" />
+                <HeroMetric label="Marches ouverts" value={liveMarkets.length} tone="emerald" />
+                <HeroMetric label="Marches a relire" value={reviewMarkets.length} tone="amber" />
               </div>
             </div>
           </header>
 
-          <section className="grid gap-3 xl:grid-cols-5">
+          <section className="grid gap-3 xl:grid-cols-6">
             <KpiTile label="Dossiers en attente" value={pendingCount} hint="Validation artisan" accent="amber" />
             <KpiTile label="Profils approuves" value={approvedCount} hint="Artisans visibles" accent="emerald" />
             <KpiTile label="Profils refuses" value={rejectedCount} hint="A historiser" accent="rose" />
             <KpiTile label="Profils bloques" value={blockedCount} hint="Acces suspendus" accent="slate" />
-            <KpiTile label="Marches a publier" value={reviewMarkets.length} hint="Moderation annonce" accent="sky" />
+            <KpiTile label="Marches en ligne" value={liveMarkets.length} hint="Diffusion active" accent="emerald" />
+            <KpiTile label="Marches total" value={marketTotal} hint="Demandes cumulees" accent="sky" />
           </section>
 
           {selectedTab === "overview" ? (
@@ -200,12 +271,12 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                     description="Controle des pieces et decisions de statut a traiter sans attente inutile."
                   />
                   <PriorityPanel
-                    title="Messages a controler"
+                    title="Moderation messages"
                     value={`${moderationThreads.length} fils`}
                     description="Surveillance des echanges sensibles entre donneurs d'ordre et artisans."
                   />
                   <PriorityPanel
-                    title="Marches a publier"
+                    title="Publication marches"
                     value={`${reviewMarkets.length} annonces`}
                     description="Derniere lecture avant diffusion publique des demandes."
                   />
@@ -229,16 +300,20 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                     </div>
                   </BandPanel>
 
-                  <BandPanel title="Boite admin" eyebrow="A traiter">
+                  <BandPanel title="Marches a arbitrer" eyebrow="Publication">
                     <div className="space-y-3">
-                      {mailboxItems.slice(0, 4).map((item) => (
-                        <RowLine
-                          key={item.id}
-                          title={item.subject}
-                          subtitle={item.preview}
-                          meta={item.badge}
-                        />
-                      ))}
+                      {reviewMarkets.length === 0 ? (
+                        <EmptyInline text="Aucun marche en attente de validation pour le moment." />
+                      ) : (
+                        reviewMarkets.slice(0, 4).map((market) => (
+                          <RowLine
+                            key={market.id}
+                            title={market.title}
+                            subtitle={`${market.ownerCompany.legalName} • ${market.city}`}
+                            meta={marketStatusLabel(market.status as MarketStatus)}
+                          />
+                        ))
+                      )}
                     </div>
                   </BandPanel>
                 </div>
@@ -259,12 +334,12 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                   <SignalCard
                     label="Marches visibles"
                     value={liveMarkets.length}
-                    detail="Demandes diffusees dans la vitrine donneur d'ordre preparee pour la suite."
+                    detail="Demandes diffusees et pretes pour la mise en relation qualifiee."
                   />
                   <SignalCard
-                    label="Marches a relire"
-                    value={reviewMarkets.length}
-                    detail="Annonces en attente de validation avant publication."
+                    label="Marches refuses"
+                    value={rejectedMarkets.length}
+                    detail="Demandes renvoyees au donneur pour amelioration ou clarification."
                   />
                 </div>
               </GlassCard>
@@ -355,13 +430,24 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
               <SectionHeading
                 eyebrow="Diffusion"
                 title="Marches en ligne"
-                description="Un premier tableau de supervision des marches visibles, avec le niveau de priorite et la pression de candidature attendue."
+                description="Les marches ci-dessous sont reels. Ils proviennent des depots donneur et ont deja ete approuves pour diffusion."
               />
-              <div className="mt-6 grid gap-4 xl:grid-cols-2">
-                {liveMarkets.map((market) => (
-                  <MarketCard key={market.id} market={market} mode="live" />
-                ))}
-              </div>
+              {liveMarkets.length === 0 ? (
+                <div className="mt-6 rounded-[1.7rem] border border-white/10 bg-black/20 px-5 py-5 text-sm text-slate-300">
+                  Aucun marche n'est en ligne pour le moment.
+                </div>
+              ) : (
+                <div className="mt-6 grid gap-4 xl:grid-cols-2">
+                  {liveMarkets.map((market) => (
+                    <MarketCard
+                      key={market.id}
+                      market={market}
+                      mode="live"
+                      action={updateMarketStatusAction}
+                    />
+                  ))}
+                </div>
+              )}
             </GlassCard>
           ) : null}
 
@@ -370,13 +456,24 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
               <SectionHeading
                 eyebrow="Publication"
                 title="Marches a valider avant mise en ligne"
-                description="Ce sas editorial permet de controler la clarte, la conformite et la qualite percue avant diffusion aux artisans."
+                description="Ce sas editorial est maintenant branche sur les vraies demandes donneur. L'admin peut approuver, refuser ou archiver chaque marche."
               />
-              <div className="mt-6 grid gap-4 xl:grid-cols-2">
-                {reviewMarkets.map((market) => (
-                  <MarketCard key={market.id} market={market} mode="review" />
-                ))}
-              </div>
+              {reviewMarkets.length === 0 ? (
+                <div className="mt-6 rounded-[1.7rem] border border-white/10 bg-black/20 px-5 py-5 text-sm text-slate-300">
+                  Aucun marche n'attend de validation pour le moment.
+                </div>
+              ) : (
+                <div className="mt-6 grid gap-4 xl:grid-cols-2">
+                  {reviewMarkets.map((market) => (
+                    <MarketCard
+                      key={market.id}
+                      market={market}
+                      mode="review"
+                      action={updateMarketStatusAction}
+                    />
+                  ))}
+                </div>
+              )}
             </GlassCard>
           ) : null}
         </section>
@@ -422,6 +519,29 @@ async function getDonorCompanies() {
     },
     orderBy: { createdAt: "desc" },
     take: 6,
+  })
+}
+
+async function getMarketsByStatus(status: MarketStatus) {
+  return prisma.market.findMany({
+    where: { status },
+    include: {
+      ownerCompany: {
+        select: {
+          legalName: true,
+          city: true,
+          email: true,
+          phone: true,
+        },
+      },
+      ownerUser: {
+        select: {
+          name: true,
+          email: true,
+        },
+      },
+    },
+    orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }],
   })
 }
 
@@ -530,12 +650,16 @@ function buildMailboxItems({
   rejectedCount,
   donorCount,
   moderationCount,
+  liveMarketCount,
+  reviewMarketCount,
 }: {
   pendingCount: number
   approvedCount: number
   rejectedCount: number
   donorCount: number
   moderationCount: number
+  liveMarketCount: number
+  reviewMarketCount: number
 }) {
   return [
     {
@@ -554,20 +678,34 @@ function buildMailboxItems({
     },
     {
       id: "mailbox-3",
+      subject: "Marches en attente de publication",
+      preview: `${reviewMarketCount} marche(s) attendent une validation avant diffusion au reseau artisan.`,
+      badge: "Publication",
+      tone: "amber",
+    },
+    {
+      id: "mailbox-4",
+      subject: "Marches actuellement en ligne",
+      preview: `${liveMarketCount} marche(s) sont deja visibles et alimentent la suite produit cote donneur d'ordre.`,
+      badge: "Diffuse",
+      tone: "emerald",
+    },
+    {
+      id: "mailbox-5",
       subject: "Profils donneurs d'ordre recemment actifs",
-      preview: `${donorCount} compte(s) donneur sont presents dans la base actuelle et peuvent nourrir les futurs marches.`,
+      preview: `${donorCount} compte(s) donneur sont presents dans la base actuelle et peuvent nourrir les prochains flux.`,
       badge: "Veille",
       tone: "default",
     },
     {
-      id: "mailbox-4",
+      id: "mailbox-6",
       subject: "Historique des dossiers refuses",
       preview: `${rejectedCount} dossier(s) sont refuses et peuvent demander une relance ou une revue qualitative.`,
       badge: "Archive",
       tone: "rose",
     },
     {
-      id: "mailbox-5",
+      id: "mailbox-7",
       subject: "Profils approuves disponibles",
       preview: `${approvedCount} artisan(s) sont deja valides et peuvent etre mis en avant dans les futurs matchings.`,
       badge: "OK",
@@ -614,78 +752,6 @@ function buildOnlineArtisans(companies: CompanyWithUser[]) {
       detail: "Activez des profils pour peupler cette vue.",
       tone: "amber",
       verified: false,
-    },
-  ]
-}
-
-function buildLiveMarkets(donorCompanies: DonorCompany[]) {
-  const generated = donorCompanies.slice(0, 4).map((company, index) => ({
-    id: `live-${company.id}`,
-    title: buildMarketTitle(company, index),
-    city: company.city,
-    budget: ["12k - 18k EUR", "20k - 35k EUR", "8k - 14k EUR", "35k+ EUR"][index % 4],
-    timeline: ["Demarrage sous 10 jours", "Livraison ce mois-ci", "Urgence moderee", "Calendrier a verrouiller"][index % 4],
-    owner: company.legalName,
-    priority: ["Haute", "Normale", "Premium", "Haute"][index % 4],
-    applications: 3 + index * 2,
-    note:
-      index % 2 === 0
-        ? "Brief clair et diffusion rassurante pour les artisans cibles."
-        : "Opportunite interessante, description a garder concise et engageante.",
-  }))
-
-  if (generated.length > 0) {
-    return generated
-  }
-
-  return [
-    {
-      id: "live-seed-1",
-      title: "Marche en ligne a venir",
-      city: "Paris",
-      budget: "A definir",
-      timeline: "Publication des futurs flux",
-      owner: "Back office FONDATIA",
-      priority: "Preparation",
-      applications: 0,
-      note: "La vue est prete a accueillir les futurs marches reels des donneurs d'ordre.",
-    },
-  ]
-}
-
-function buildReviewMarkets(donorCompanies: DonorCompany[]) {
-  const source = donorCompanies.length > 0 ? donorCompanies : []
-
-  const generated = source.slice(0, 4).map((company, index) => ({
-    id: `review-${company.id}`,
-    title: buildMarketTitle(company, index + 1),
-    city: company.city,
-    budget: ["15k - 22k EUR", "6k - 10k EUR", "28k - 42k EUR", "10k - 18k EUR"][index % 4],
-    timeline: ["Verifier la clarte du besoin", "Piece budget a preciser", "Verifier les delais annonces", "Controle du ton et des details"][index % 4],
-    owner: company.legalName,
-    priority: ["Validation requise", "A completer", "Relecture", "Validation requise"][index % 4],
-    applications: 0,
-    note:
-      index % 2 === 0
-        ? "Derniere passe qualite avant publication au reseau artisan."
-        : "Verifier coherence budget, localisation et informations de contact.",
-  }))
-
-  if (generated.length > 0) {
-    return generated
-  }
-
-  return [
-    {
-      id: "review-seed-1",
-      title: "Premier marche a relire",
-      city: "Lyon",
-      budget: "A cadrer",
-      timeline: "Preparer la publication",
-      owner: "Back office FONDATIA",
-      priority: "Validation requise",
-      applications: 0,
-      note: "Cette file est prete pour le futur modele de marches et la moderation avant mise en ligne.",
     },
   ]
 }
@@ -790,11 +856,20 @@ function SectionHeading({
   )
 }
 
-function HeroMetric({ label, value, tone }: { label: string; value: number; tone: "default" | "sky" | "amber" }) {
+function HeroMetric({
+  label,
+  value,
+  tone,
+}: {
+  label: string
+  value: number
+  tone: "default" | "sky" | "amber" | "emerald"
+}) {
   const tones = {
     default: "border-white/10 bg-white/5 text-white",
     sky: "border-sky-300/20 bg-sky-300/10 text-sky-50",
     amber: "border-amber-300/20 bg-amber-300/10 text-amber-50",
+    emerald: "border-emerald-300/20 bg-emerald-300/10 text-emerald-50",
   }
 
   return (
@@ -968,39 +1043,79 @@ function PresenceCard({
 function MarketCard({
   market,
   mode,
+  action,
 }: {
-  market: {
-    id: string
-    title: string
-    city: string
-    budget: string
-    timeline: string
-    owner: string
-    priority: string
-    applications: number
-    note: string
-  }
+  market: MarketWithOwner
   mode: "live" | "review"
+  action: (formData: FormData) => Promise<void>
 }) {
   return (
     <div className="rounded-[1.7rem] border border-white/10 bg-black/20 p-5">
       <div className="flex flex-wrap items-center gap-3">
         <h4 className="text-lg font-semibold text-white">{market.title}</h4>
-        <InlineBadge tone={mode === "live" ? "emerald" : "amber"}>{market.priority}</InlineBadge>
+        <InlineBadge tone={marketTone(market.status as MarketStatus)}>
+          {marketStatusLabel(market.status as MarketStatus)}
+        </InlineBadge>
       </div>
-      <p className="mt-3 text-sm leading-7 text-slate-300">{market.note}</p>
+      <p className="mt-3 text-sm leading-7 text-slate-300">{market.description}</p>
       <div className="mt-5 grid gap-3 sm:grid-cols-2">
-        <MutedPanel label="Ville" value={market.city} />
-        <MutedPanel label="Budget" value={market.budget} />
-        <MutedPanel label="Delai" value={market.timeline} />
-        <MutedPanel label="Origine" value={market.owner} />
+        <MutedPanel label="Activite" value={market.activity} />
+        <MutedPanel label="Ville" value={`${market.city} (${market.postalCode})`} />
+        <MutedPanel label="Budget" value={formatBudget(market.budgetMin, market.budgetMax)} />
+        <MutedPanel label="Delai" value={market.timeframe ?? "A preciser"} />
+        <MutedPanel label="Origine" value={market.ownerCompany.legalName} />
+        <MutedPanel label="Contact" value={`${market.ownerUser.name} • ${market.ownerCompany.phone}`} />
       </div>
-      <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-[1.4rem] border border-white/10 bg-white/5 px-4 py-3 text-sm text-slate-200">
-        <span>{mode === "live" ? `${market.applications} candidature(s) attendues` : "En attente de publication"}</span>
-        <button className="rounded-[1.1rem] border border-white/10 bg-black/20 px-4 py-2 text-sm text-white transition hover:bg-white/10">
-          {mode === "live" ? "Voir le marche" : "Valider"}
-        </button>
-      </div>
+
+      {market.rejectionReason ? (
+        <div className="mt-4 rounded-[1.4rem] border border-rose-300/20 bg-rose-300/10 px-4 py-3 text-sm text-rose-100">
+          Motif de retour : {market.rejectionReason}
+        </div>
+      ) : null}
+
+      {market.adminNotes ? (
+        <div className="mt-4 rounded-[1.4rem] border border-white/10 bg-white/5 px-4 py-3 text-sm text-slate-200">
+          Note admin : {market.adminNotes}
+        </div>
+      ) : null}
+
+      <form action={action} className="mt-5 space-y-3 rounded-[1.5rem] border border-white/10 bg-white/5 p-4">
+        <input type="hidden" name="marketId" value={market.id} />
+        <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto]">
+          <select
+            name="status"
+            defaultValue={mode === "review" ? "PENDING_REVIEW" : market.status}
+            className="rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm text-white outline-none transition focus:border-sky-300/60"
+          >
+            <option value="PENDING_REVIEW">PENDING_REVIEW</option>
+            <option value="LIVE">LIVE</option>
+            <option value="REJECTED">REJECTED</option>
+            <option value="ARCHIVED">ARCHIVED</option>
+          </select>
+          <button
+            type="submit"
+            className="rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-sm font-medium text-white transition hover:bg-white/15"
+          >
+            Mettre a jour
+          </button>
+        </div>
+
+        <textarea
+          name="adminNotes"
+          rows={3}
+          defaultValue={market.adminNotes ?? ""}
+          placeholder="Note interne ou recommandation avant diffusion"
+          className="w-full rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm text-white outline-none transition placeholder:text-white/30 focus:border-sky-300/60"
+        />
+
+        <textarea
+          name="rejectionReason"
+          rows={3}
+          defaultValue={market.rejectionReason ?? ""}
+          placeholder="Motif de retour si le marche doit etre corrige par le donneur"
+          className="w-full rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm text-white outline-none transition placeholder:text-white/30 focus:border-sky-300/60"
+        />
+      </form>
     </div>
   )
 }
@@ -1030,7 +1145,13 @@ function RowLine({ title, subtitle, meta }: { title: string; subtitle: string; m
   )
 }
 
-function InlineBadge({ children, tone }: { children: React.ReactNode; tone: "default" | "amber" | "rose" | "emerald" | "sky" }) {
+function InlineBadge({
+  children,
+  tone,
+}: {
+  children: React.ReactNode
+  tone: "default" | "amber" | "rose" | "emerald" | "sky"
+}) {
   const styles = {
     default: "border-white/10 bg-white/5 text-slate-200",
     amber: "border-amber-300/20 bg-amber-300/10 text-amber-50",
@@ -1090,6 +1211,32 @@ function statusLabel(status: CompanyStatus) {
   }
 }
 
+function marketStatusLabel(status: MarketStatus) {
+  switch (status) {
+    case "PENDING_REVIEW":
+      return "En validation"
+    case "LIVE":
+      return "En ligne"
+    case "REJECTED":
+      return "Retour admin"
+    case "ARCHIVED":
+      return "Archive"
+  }
+}
+
+function marketTone(status: MarketStatus): "amber" | "emerald" | "rose" | "slate" | "sky" | "default" {
+  switch (status) {
+    case "PENDING_REVIEW":
+      return "amber"
+    case "LIVE":
+      return "emerald"
+    case "REJECTED":
+      return "rose"
+    case "ARCHIVED":
+      return "slate"
+  }
+}
+
 function tabHref(tab: AdminTab, status?: CompanyStatus) {
   const params = new URLSearchParams()
 
@@ -1127,9 +1274,33 @@ function buildSpecialty(company: CompanyWithUser) {
   return specialties[seed]
 }
 
-function buildMarketTitle(company: DonorCompany, index: number) {
-  const prefixes = ["Renovation", "Amenagement", "Rehabilitation", "Mise aux normes"]
-  return `${prefixes[index % prefixes.length]} a ${company.city}`
+function formatBudget(min: number | null, max: number | null) {
+  if (min == null && max == null) {
+    return "Budget a preciser"
+  }
+
+  if (min != null && max != null) {
+    return `${formatCurrency(min)} - ${formatCurrency(max)}`
+  }
+
+  return min != null ? `A partir de ${formatCurrency(min)}` : `Jusqu'a ${formatCurrency(max as number)}`
+}
+
+function formatCurrency(value: number) {
+  return new Intl.NumberFormat("fr-FR", {
+    style: "currency",
+    currency: "EUR",
+    maximumFractionDigits: 0,
+  }).format(value)
+}
+
+function normalizeString(value: FormDataEntryValue | null) {
+  if (typeof value !== "string") {
+    return null
+  }
+
+  const trimmed = value.trim()
+  return trimmed.length > 0 ? trimmed : null
 }
 
 function mapTone(value: string): "default" | "amber" | "rose" | "emerald" | "sky" {
