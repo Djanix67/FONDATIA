@@ -103,7 +103,6 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   const onlineArtisans = buildOnlineArtisans(recentApprovedArtisans)
   const liveMarkets = buildLiveMarkets(donorCompanies)
   const reviewMarkets = buildReviewMarkets(donorCompanies)
-  const pendingArtisans = artisanCompanies.filter((company) => company.status === "PENDING")
   const latestArtisans = artisanCompanies.slice(0, 4)
 
   return (
@@ -891,7 +890,7 @@ function ConversationCard({
         <div className="max-w-3xl">
           <div className="flex flex-wrap items-center gap-3">
             <h4 className="text-lg font-semibold text-white">
-              {thread.counterpartA} ↔ {thread.counterpartB}
+              {thread.counterpartA} {"<->"} {thread.counterpartB}
             </h4>
             <InlineBadge tone={thread.level === "Prioritaire" ? "rose" : thread.level === "A surveiller" ? "amber" : "default"}>
               {thread.level}
