@@ -30,4 +30,42 @@ export const artisanRegisterSchema = z.object({
   identityCardBackUrl: z.string().url("La carte d'identite verso est requise"),
 })
 
+export const marketCreateSchema = z
+  .object({
+    title: z.string().trim().min(6, "Le titre du marche est requis").max(120, "Titre trop long"),
+    description: z
+      .string()
+      .trim()
+      .min(40, "La description doit contenir au moins 40 caracteres")
+      .max(4000, "Description trop longue"),
+    activity: z.string().trim().min(2, "L'activite recherchee est requise").max(80, "Activite trop longue"),
+    city: z.string().trim().min(2, "La ville est requise").max(80, "Ville trop longue"),
+    postalCode: z.string().trim().min(4, "Le code postal est requis").max(10, "Code postal invalide"),
+    budgetMin: z.coerce.number().int().min(0).optional().nullable(),
+    budgetMax: z.coerce.number().int().min(0).optional().nullable(),
+    timeframe: z.string().trim().max(120, "Delai trop long").optional().nullable(),
+    desiredStartDate: z.string().trim().optional().nullable(),
+  })
+  .refine(
+    (data) => {
+      if (data.budgetMin == null || data.budgetMax == null) {
+        return true
+      }
+
+      return data.budgetMax >= data.budgetMin
+    },
+    {
+      message: "Le budget maximum doit etre superieur ou egal au budget minimum",
+      path: ["budgetMax"],
+    }
+  )
+
+export const marketAdminStatusSchema = z.object({
+  status: z.enum(["PENDING_REVIEW", "LIVE", "REJECTED", "ARCHIVED"]),
+  adminNotes: z.string().trim().max(600).optional().nullable(),
+  rejectionReason: z.string().trim().max(600).optional().nullable(),
+})
+
 export type ArtisanRegisterInput = z.infer<typeof artisanRegisterSchema>
+export type MarketCreateInput = z.infer<typeof marketCreateSchema>
+export type MarketAdminStatusInput = z.infer<typeof marketAdminStatusSchema>
