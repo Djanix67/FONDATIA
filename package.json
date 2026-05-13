@@ -10,7 +10,8 @@
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev --name init_fondatia",
     "db:studio": "prisma studio",
-    "db:seed-admin": "tsx prisma/seed-admin.ts"
+    "db:seed-admin": "tsx prisma/seed-admin.ts",
+    "db:seed-donor-test": "tsx prisma/seed-donor-test.ts"
   },
   "dependencies": {
     "@prisma/client": "6.16.2",
