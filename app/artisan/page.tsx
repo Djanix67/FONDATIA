@@ -2,7 +2,7 @@ import Link from "next/link"
 import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
 import { getServerSession } from "next-auth"
-import { CompanyStatus, MarketStatus } from "@prisma/client"
+import { CompanyStatus, MarketExecutionStatus, MarketStatus } from "@prisma/client"
 import { z } from "zod"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
@@ -155,7 +155,7 @@ export default async function ArtisanPage({ searchParams }: ArtisanPageProps) {
       : {}),
   }
 
-  const [liveMarkets, liveMarketsCount, liveActivities] = await Promise.all([
+  const [liveMarkets, liveMarketsCount, liveActivities, activeAssignedMarkets, completedAssignedMarkets] = await Promise.all([
     prisma.market.findMany({
       where: marketWhere,
       include: {
@@ -185,6 +185,40 @@ export default async function ArtisanPage({ searchParams }: ArtisanPageProps) {
       orderBy: { activity: "asc" },
       take: 8,
     }),
+    prisma.market.findMany({
+      where: {
+        assignedArtisanUserId: userId,
+        executionStatus: MarketExecutionStatus.ASSIGNED,
+      },
+      include: {
+        ownerCompany: {
+          select: {
+            legalName: true,
+            city: true,
+            phone: true,
+            email: true,
+          },
+        },
+      },
+      orderBy: [{ assignedAt: "desc" }, { updatedAt: "desc" }],
+    }),
+    prisma.market.findMany({
+      where: {
+        assignedArtisanUserId: userId,
+        executionStatus: MarketExecutionStatus.COMPLETED,
+      },
+      include: {
+        ownerCompany: {
+          select: {
+            legalName: true,
+            city: true,
+            phone: true,
+            email: true,
+          },
+        },
+      },
+      orderBy: [{ completedAt: "desc" }, { updatedAt: "desc" }],
+    }),
   ])
 
   const nextSteps = getNextSteps(status, company?.rejectedReason)
@@ -192,9 +226,9 @@ export default async function ArtisanPage({ searchParams }: ArtisanPageProps) {
     status,
     rejectedReason: company?.rejectedReason,
     liveMarketCount: liveMarketsCount,
+    activeAssignedCount: activeAssignedMarkets.length,
+    completedAssignedCount: completedAssignedMarkets.length,
   })
-  const activeMarketModules = buildPlaceholderModules("active")
-  const completedMarketModules = buildPlaceholderModules("completed")
 
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top,rgba(56,189,248,0.12),transparent_24%),linear-gradient(180deg,#020617_0%,#050b16_38%,#020617_100%)] text-white">
@@ -205,7 +239,7 @@ export default async function ArtisanPage({ searchParams }: ArtisanPageProps) {
               <p className="text-[11px] uppercase tracking-[0.32em] text-sky-200/70">FONDATIA</p>
               <h1 className="mt-3 text-2xl font-semibold tracking-tight text-white">Dashboard artisan</h1>
               <p className="mt-3 text-sm leading-6 text-slate-300">
-                Un espace unique pour piloter votre dossier, explorer les opportunites et garder votre profil exploitable.
+                Un espace unique pour piloter votre dossier, explorer les opportunites et suivre vos marches reels.
               </p>
             </div>
 
@@ -230,8 +264,8 @@ export default async function ArtisanPage({ searchParams }: ArtisanPageProps) {
             <div className="mt-auto space-y-3 pt-6">
               <div className="rounded-[1.5rem] border border-white/10 bg-black/20 px-4 py-4">
                 <p className="text-xs uppercase tracking-[0.24em] text-slate-400">A retenir</p>
-                <p className="mt-2 text-sm text-white">{completedDocuments}/4 justificatifs disponibles</p>
-                <p className="mt-1 text-sm text-slate-400">{liveMarketsCount} marche(s) visibles depuis la plateforme</p>
+                <p className="mt-2 text-sm text-white">{activeAssignedMarkets.length} marche(s) actuellement en cours</p>
+                <p className="mt-1 text-sm text-slate-400">{completedAssignedMarkets.length} marche(s) deja termines</p>
               </div>
 
               <Link
@@ -259,8 +293,8 @@ export default async function ArtisanPage({ searchParams }: ArtisanPageProps) {
 
               <div className="grid min-w-full gap-3 sm:grid-cols-4 xl:min-w-[720px]">
                 <HeroMetric label="Statut dossier" value={statusLabel(status)} tone={statusTone(status)} />
-                <HeroMetric label="Profil complet" value={`${profileCompletion}%`} tone="sky" />
-                <HeroMetric label="Documents recus" value={`${completedDocuments}/4`} tone="emerald" />
+                <HeroMetric label="Marches en cours" value={String(activeAssignedMarkets.length)} tone="sky" />
+                <HeroMetric label="Marches termines" value={String(completedAssignedMarkets.length)} tone="emerald" />
                 <HeroMetric label="Marches visibles" value={String(liveMarketsCount)} tone="amber" />
               </div>
             </div>
@@ -290,14 +324,8 @@ export default async function ArtisanPage({ searchParams }: ArtisanPageProps) {
 
                 <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
                   <MetricCard label="Entreprise" value={company?.legalName ?? "Non renseignee"} />
-                  <MetricCard
-                    label="Dossier cree le"
-                    value={company ? formatDate(company.createdAt) : "Non disponible"}
-                  />
-                  <MetricCard
-                    label="Valide le"
-                    value={company?.validatedAt ? formatDate(company.validatedAt) : "Non valide"}
-                  />
+                  <MetricCard label="Marches actifs" value={String(activeAssignedMarkets.length)} />
+                  <MetricCard label="Marches livres" value={String(completedAssignedMarkets.length)} />
                 </div>
 
                 <div className="mt-8 grid gap-4 lg:grid-cols-3">
@@ -312,9 +340,9 @@ export default async function ArtisanPage({ searchParams }: ArtisanPageProps) {
                     description="Explorer les marches publies et filtrer les opportunites disponibles."
                   />
                   <QuickLink
-                    href={tabHref("settings")}
-                    title="Parametres"
-                    description="Maintenir vos coordonnees a jour pour rester exploitable cote plateforme."
+                    href={tabHref("active-markets")}
+                    title="Marches en cours"
+                    description="Suivre les missions qui vous ont reellement ete attribuees par l'administration."
                   />
                 </div>
               </GlassCard>
@@ -428,7 +456,7 @@ export default async function ArtisanPage({ searchParams }: ArtisanPageProps) {
                 <p className="text-sm text-slate-300">
                   {liveMarkets.length} marche(s) affiches sur {liveMarketsCount} disponible(s)
                 </p>
-                {(searchQuery || cityQuery || activityQuery) ? (
+                {searchQuery || cityQuery || activityQuery ? (
                   <Link
                     href="/artisan?tab=market-search"
                     className="rounded-full border border-white/10 bg-white/5 px-3 py-2 text-sm text-white transition hover:bg-white/10"
@@ -458,17 +486,20 @@ export default async function ArtisanPage({ searchParams }: ArtisanPageProps) {
               <SectionHeading
                 eyebrow="Production"
                 title="Marches en cours"
-                description="La vue est prete pour accueillir les marches attribues a l'artisan. Elle sera automatiquement alimentee des que la relation d'attribution artisan <-> marche sera activee dans le modele."
+                description="Ces marches vous ont ete reellement attribues par l'administration. Vous retrouvez ici le contexte, le contact donneur et le cadre d'execution."
               />
-              <div className="mt-6 grid gap-4 xl:grid-cols-3">
-                {activeMarketModules.map((module) => (
-                  <PlaceholderCard key={module.title} module={module} />
-                ))}
-              </div>
-              <EmptyState
-                title="Aucun marche en cours pour le moment"
-                description="Cette zone affichera les marches acceptes, les jalons de chantier, les points de contact et les prochaines actions a realiser."
-              />
+              {activeAssignedMarkets.length === 0 ? (
+                <EmptyState
+                  title="Aucun marche en cours pour le moment"
+                  description="Cette zone affichera automatiquement les marches attribues des qu'un admin vous positionne sur une mission."
+                />
+              ) : (
+                <div className="mt-6 grid gap-4 xl:grid-cols-2">
+                  {activeAssignedMarkets.map((market) => (
+                    <AssignedMarketCard key={market.id} market={market} mode="active" />
+                  ))}
+                </div>
+              )}
             </GlassCard>
           ) : null}
 
@@ -477,17 +508,20 @@ export default async function ArtisanPage({ searchParams }: ArtisanPageProps) {
               <SectionHeading
                 eyebrow="Historique"
                 title="Marches termines"
-                description="L'historique final des chantiers est reserve ici pour capitaliser sur les references livre, la satisfaction client et les prochaines opportunites."
+                description="Les marches clotures construisent votre historique d'execution et pourront servir de base de credibilite pour la suite produit."
               />
-              <div className="mt-6 grid gap-4 xl:grid-cols-3">
-                {completedMarketModules.map((module) => (
-                  <PlaceholderCard key={module.title} module={module} />
-                ))}
-              </div>
-              <EmptyState
-                title="Aucun marche termine enregistre"
-                description="Une fois les premiers marches finalises, cette vue servira de portefeuille de references et de preuve de fiabilite pour l'artisan."
-              />
+              {completedAssignedMarkets.length === 0 ? (
+                <EmptyState
+                  title="Aucun marche termine enregistre"
+                  description="Une fois les premiers marches finalises, cette vue servira de portefeuille de references et de preuve de fiabilite pour l'artisan."
+                />
+              ) : (
+                <div className="mt-6 grid gap-4 xl:grid-cols-2">
+                  {completedAssignedMarkets.map((market) => (
+                    <AssignedMarketCard key={market.id} market={market} mode="completed" />
+                  ))}
+                </div>
+              )}
             </GlassCard>
           ) : null}
 
@@ -590,9 +624,9 @@ export default async function ArtisanPage({ searchParams }: ArtisanPageProps) {
                       detail="Le suivi des justificatifs reste visible ici avant le branchement complet de l'upload Storage."
                     />
                     <UtilityRow
-                      title="Acces support"
-                      value="Pret"
-                      detail="La future messagerie support pourra se brancher sur la vue de messagerie deja en place."
+                      title="Marches suivis"
+                      value={`${activeAssignedMarkets.length + completedAssignedMarkets.length}`}
+                      detail="Le compteur se nourrit maintenant des affectations reelles faites par l'administration."
                     />
                   </div>
                 </GlassCard>
@@ -759,16 +793,55 @@ function MarketOpportunityCard({
   )
 }
 
-function PlaceholderCard({
-  module,
+function AssignedMarketCard({
+  market,
+  mode,
 }: {
-  module: { title: string; description: string; badge: string }
+  market: {
+    id: string
+    title: string
+    description: string
+    activity: string
+    city: string
+    postalCode: string
+    budgetMin: number | null
+    budgetMax: number | null
+    timeframe: string | null
+    assignedAt: Date | null
+    completedAt: Date | null
+    ownerCompany: {
+      legalName: string
+      city: string
+      phone: string
+      email: string
+    }
+  }
+  mode: "active" | "completed"
 }) {
   return (
-    <div className="rounded-[1.6rem] border border-white/10 bg-black/20 p-5">
-      <Badge tone="sky">{module.badge}</Badge>
-      <h4 className="mt-4 text-lg font-semibold text-white">{module.title}</h4>
-      <p className="mt-3 text-sm leading-7 text-slate-300">{module.description}</p>
+    <div className="rounded-[1.7rem] border border-white/10 bg-black/20 p-5">
+      <div className="flex flex-wrap items-center gap-3">
+        <h4 className="text-lg font-semibold text-white">{market.title}</h4>
+        <Badge tone={mode === "active" ? "sky" : "emerald"}>{mode === "active" ? "En cours" : "Termine"}</Badge>
+      </div>
+      <p className="mt-3 text-sm leading-7 text-slate-300">{market.description}</p>
+      <div className="mt-5 grid gap-3 sm:grid-cols-2">
+        <MutedPanel label="Activite" value={market.activity} />
+        <MutedPanel label="Zone" value={`${market.city} (${market.postalCode})`} />
+        <MutedPanel label="Budget" value={formatBudget(market.budgetMin, market.budgetMax)} />
+        <MutedPanel label="Delai" value={market.timeframe ?? "A preciser"} />
+        <MutedPanel label="Donneur" value={market.ownerCompany.legalName} />
+        <MutedPanel label="Contact" value={`${market.ownerCompany.phone} • ${market.ownerCompany.email}`} />
+      </div>
+      <div className="mt-4 flex flex-wrap items-center gap-3 text-sm text-slate-300">
+        <span>{market.assignedAt ? `Attribue le ${formatDate(market.assignedAt)}` : "Attribution recente"}</span>
+        {mode === "completed" && market.completedAt ? (
+          <>
+            <span className="text-slate-500">•</span>
+            <span>Termine le {formatDate(market.completedAt)}</span>
+          </>
+        ) : null}
+      </div>
     </div>
   )
 }
@@ -918,9 +991,9 @@ function getHeaderDescription(tab: ArtisanTab, statusTitle: string) {
     case "market-search":
       return "Parcourez les marches actuellement publies par la plateforme et affinez la recherche sans quitter votre espace artisan."
     case "active-markets":
-      return "La structure de suivi est prete pour accueillir les marches attribues, les jalons de chantier et les points de coordination a venir."
+      return "La vue est maintenant alimentee par de vraies attributions admin. Vous y retrouvez les missions actuellement en execution."
     case "completed-markets":
-      return "L'historique servira a valoriser le travail livre, les references consolidees et la credibilite de l'artisan sur la plateforme."
+      return "L'historique des marches termines se construit maintenant sur des donnees d'execution reelles."
     case "settings":
       return `Les parametres mettent a jour les coordonnees utiles sans toucher aux elements sensibles. Statut actuel : ${statusTitle}.`
   }
@@ -931,7 +1004,7 @@ function getNextSteps(status: CompanyStatus, rejectedReason?: string | null) {
     return [
       "Votre profil est mobilisable pour la suite produit et les futurs flux de mise en relation qualifies.",
       "Gardez vos coordonnees, votre ville d'intervention et vos justificatifs a jour pour accelerer les prises de contact.",
-      "Consultez regulierement les marches en ligne depuis l'onglet dedie.",
+      "Consultez regulierement les marches en ligne et suivez vos missions attribuees depuis les onglets dedies.",
     ]
   }
 
@@ -964,10 +1037,14 @@ function buildInboxItems({
   status,
   rejectedReason,
   liveMarketCount,
+  activeAssignedCount,
+  completedAssignedCount,
 }: {
   status: CompanyStatus
   rejectedReason?: string | null
   liveMarketCount: number
+  activeAssignedCount: number
+  completedAssignedCount: number
 }) {
   return [
     {
@@ -992,52 +1069,12 @@ function buildInboxItems({
     },
     {
       id: "message-3",
-      category: "Messagerie pro",
-      title: "Les echanges entre professionnels seront centralises ici",
+      category: "Execution",
+      title: `${activeAssignedCount} marche(s) en cours • ${completedAssignedCount} termine(s)`,
       preview:
-        "Le slot d'interface est pret pour brancher les discussions avec les autres professionnels, sans changer vos habitudes de navigation.",
-      status: "Preparation",
+        "Les affectations reelles admin alimentent maintenant les vues de production et d'historique dans votre dashboard.",
+      status: "Reel",
       tone: "sky",
-    },
-  ]
-}
-
-function buildPlaceholderModules(type: "active" | "completed") {
-  if (type === "active") {
-    return [
-      {
-        title: "Suivi chantier",
-        description: "Avancement du marche, prochaines etapes et points de blocage a traiter.",
-        badge: "Jalons",
-      },
-      {
-        title: "Coordination client",
-        description: "Contacts cle, contexte du marche et rappels utiles pour rester fluide dans l'execution.",
-        badge: "Coordination",
-      },
-      {
-        title: "Documents de mission",
-        description: "Pieces associees au marche, consignes et traces utiles a retrouver sans friction.",
-        badge: "Documents",
-      },
-    ]
-  }
-
-  return [
-    {
-      title: "References livrees",
-      description: "Historique des marches finalises pour valoriser l'experience et la fiabilite de l'artisan.",
-      badge: "Portfolio",
-    },
-    {
-      title: "Retour qualite",
-      description: "Synthese des points forts et retours eventuels pour preparer les futures opportunites.",
-      badge: "Qualite",
-    },
-    {
-      title: "Capitalisation commerciale",
-      description: "Base de relecture des marches termines pour nourrir la suite produit et la credibilite du profil.",
-      badge: "Historique",
     },
   ]
 }
