@@ -6,10 +6,15 @@ import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { GlassCard } from "@/components/ui/glass-card"
 import { CompanyStatusActions } from "@/components/admin/company-status-actions"
-import { marketAdminStatusSchema } from "@/lib/validations/artisan-register"
+import {
+  marketAdminStatusSchema,
+  marketAssignmentSchema,
+  marketExecutionStatusSchema,
+} from "@/lib/validations/artisan-register"
 
 type CompanyStatus = "PENDING" | "APPROVED" | "REJECTED" | "BLOCKED"
 type MarketStatus = "PENDING_REVIEW" | "LIVE" | "REJECTED" | "ARCHIVED"
+type MarketExecutionStatus = "OPEN" | "ASSIGNED" | "COMPLETED"
 type AdminTab =
   | "overview"
   | "dossiers"
@@ -29,6 +34,7 @@ type AdminPageProps = {
 type CompanyWithUser = Awaited<ReturnType<typeof getArtisanCompanies>>[number]
 type DonorCompany = Awaited<ReturnType<typeof getDonorCompanies>>[number]
 type MarketWithOwner = Awaited<ReturnType<typeof getMarketsByStatus>>[number]
+type ApprovedArtisanOption = Awaited<ReturnType<typeof getApprovedArtisanOptions>>[number]
 
 const tabs: Array<{ id: AdminTab; label: string; eyebrow: string }> = [
   { id: "overview", label: "Vue d'ensemble", eyebrow: "Synthese" },
@@ -108,6 +114,93 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
 
     revalidatePath("/admin")
     revalidatePath("/donneur-ordre")
+    revalidatePath("/artisan")
+  }
+
+  async function assignMarketAction(formData: FormData) {
+    "use server"
+
+    const session = await getServerSession(authOptions)
+
+    if (!session?.user || (session.user as { role?: string }).role !== "ADMIN") {
+      redirect("/login?callbackUrl=/admin")
+    }
+
+    const parsed = marketAssignmentSchema.safeParse({
+      marketId: String(formData.get("marketId") ?? ""),
+      assignedArtisanCompanyId: String(formData.get("assignedArtisanCompanyId") ?? ""),
+      executionStatus: String(formData.get("executionStatus") ?? "ASSIGNED"),
+    })
+
+    if (!parsed.success) {
+      revalidatePath("/admin")
+      return
+    }
+
+    const artisanCompany = await prisma.company.findFirst({
+      where: {
+        id: parsed.data.assignedArtisanCompanyId,
+        status: "APPROVED",
+        user: { role: "ARTISAN" },
+      },
+      select: {
+        id: true,
+        userId: true,
+      },
+    })
+
+    if (!artisanCompany) {
+      revalidatePath("/admin")
+      return
+    }
+
+    await prisma.market.update({
+      where: { id: parsed.data.marketId },
+      data: {
+        assignedArtisanCompanyId: artisanCompany.id,
+        assignedArtisanUserId: artisanCompany.userId,
+        executionStatus: parsed.data.executionStatus as MarketExecutionStatus,
+        assignedAt: new Date(),
+        completedAt: parsed.data.executionStatus === "COMPLETED" ? new Date() : null,
+      },
+    })
+
+    revalidatePath("/admin")
+    revalidatePath("/artisan")
+  }
+
+  async function updateExecutionStatusAction(formData: FormData) {
+    "use server"
+
+    const session = await getServerSession(authOptions)
+
+    if (!session?.user || (session.user as { role?: string }).role !== "ADMIN") {
+      redirect("/login?callbackUrl=/admin")
+    }
+
+    const parsed = marketExecutionStatusSchema.safeParse({
+      marketId: String(formData.get("marketId") ?? ""),
+      executionStatus: String(formData.get("executionStatus") ?? ""),
+    })
+
+    if (!parsed.success) {
+      revalidatePath("/admin")
+      return
+    }
+
+    const nextExecutionStatus = parsed.data.executionStatus as MarketExecutionStatus
+
+    await prisma.market.update({
+      where: { id: parsed.data.marketId },
+      data: {
+        executionStatus: nextExecutionStatus,
+        completedAt: nextExecutionStatus === "COMPLETED" ? new Date() : null,
+        assignedAt: nextExecutionStatus === "ASSIGNED" ? new Date() : undefined,
+      },
+    })
+
+    revalidatePath("/admin")
+    revalidatePath("/artisan")
   }
 
   const params = await searchParams
@@ -118,6 +211,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     artisanCompanies,
     recentApprovedArtisans,
     donorCompanies,
+    approvedArtisanOptions,
     artisanTotal,
     pendingCount,
     approvedCount,
@@ -149,6 +243,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
       take: 6,
     }),
     getDonorCompanies(),
+    getApprovedArtisanOptions(),
     prisma.company.count({ where: { user: { role: "ARTISAN" } } }),
     prisma.company.count({ where: { user: { role: "ARTISAN" }, status: "PENDING" } }),
     prisma.company.count({ where: { user: { role: "ARTISAN" }, status: "APPROVED" } }),
@@ -430,7 +525,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
               <SectionHeading
                 eyebrow="Diffusion"
                 title="Marches en ligne"
-                description="Les marches ci-dessous sont reels. Ils proviennent des depots donneur et ont deja ete approuves pour diffusion."
+                description="Les marches ci-dessous sont reels. Ils proviennent des depots donneur, ont ete approuves pour diffusion et peuvent maintenant etre attribues a un artisan qualifie."
               />
               {liveMarkets.length === 0 ? (
                 <div className="mt-6 rounded-[1.7rem] border border-white/10 bg-black/20 px-5 py-5 text-sm text-slate-300">
@@ -443,7 +538,10 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                       key={market.id}
                       market={market}
                       mode="live"
-                      action={updateMarketStatusAction}
+                      statusAction={updateMarketStatusAction}
+                      assignAction={assignMarketAction}
+                      executionAction={updateExecutionStatusAction}
+                      artisanOptions={approvedArtisanOptions}
                     />
                   ))}
                 </div>
@@ -469,7 +567,10 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                       key={market.id}
                       market={market}
                       mode="review"
-                      action={updateMarketStatusAction}
+                      statusAction={updateMarketStatusAction}
+                      assignAction={assignMarketAction}
+                      executionAction={updateExecutionStatusAction}
+                      artisanOptions={approvedArtisanOptions}
                     />
                   ))}
                 </div>
@@ -522,6 +623,27 @@ async function getDonorCompanies() {
   })
 }
 
+async function getApprovedArtisanOptions() {
+  return prisma.company.findMany({
+    where: {
+      status: "APPROVED",
+      user: { role: "ARTISAN" },
+    },
+    select: {
+      id: true,
+      legalName: true,
+      city: true,
+      user: {
+        select: {
+          name: true,
+          email: true,
+        },
+      },
+    },
+    orderBy: { updatedAt: "desc" },
+  })
+}
+
 async function getMarketsByStatus(status: MarketStatus) {
   return prisma.market.findMany({
     where: { status },
@@ -538,6 +660,12 @@ async function getMarketsByStatus(status: MarketStatus) {
         select: {
           name: true,
           email: true,
+        },
+      },
+      assignedArtisanCompany: {
+        select: {
+          legalName: true,
+          city: true,
         },
       },
     },
@@ -577,7 +705,7 @@ function getHeaderDescription(tab: AdminTab) {
     case "artisans-online":
       return "Une vue rapide pour savoir quels profils mobilisables peuvent etre valorises dans le matching et le suivi des demandes."
     case "markets-live":
-      return "L'admin garde un oeil sur les opportunites diffusees, leur niveau d'urgence et la qualite de leur presentation."
+      return "L'admin garde un oeil sur les opportunites diffusees, leur niveau d'urgence, leur attribution artisan et leur progression terrain."
     case "markets-review":
       return "Avant publication, chaque marche peut etre relu comme un contenu premium, clair, rassurant et utile pour les artisans."
   }
@@ -1043,18 +1171,29 @@ function PresenceCard({
 function MarketCard({
   market,
   mode,
-  action,
+  statusAction,
+  assignAction,
+  executionAction,
+  artisanOptions,
 }: {
   market: MarketWithOwner
   mode: "live" | "review"
-  action: (formData: FormData) => Promise<void>
+  statusAction: (formData: FormData) => Promise<void>
+  assignAction: (formData: FormData) => Promise<void>
+  executionAction: (formData: FormData) => Promise<void>
+  artisanOptions: ApprovedArtisanOption[]
 }) {
+  const canAssign = market.status === "LIVE"
+
   return (
     <div className="rounded-[1.7rem] border border-white/10 bg-black/20 p-5">
       <div className="flex flex-wrap items-center gap-3">
         <h4 className="text-lg font-semibold text-white">{market.title}</h4>
         <InlineBadge tone={marketTone(market.status as MarketStatus)}>
           {marketStatusLabel(market.status as MarketStatus)}
+        </InlineBadge>
+        <InlineBadge tone={executionTone((market.executionStatus as MarketExecutionStatus) ?? "OPEN")}>
+          {executionStatusLabel((market.executionStatus as MarketExecutionStatus) ?? "OPEN")}
         </InlineBadge>
       </div>
       <p className="mt-3 text-sm leading-7 text-slate-300">{market.description}</p>
@@ -1066,6 +1205,12 @@ function MarketCard({
         <MutedPanel label="Origine" value={market.ownerCompany.legalName} />
         <MutedPanel label="Contact" value={`${market.ownerUser.name} • ${market.ownerCompany.phone}`} />
       </div>
+
+      {market.assignedArtisanCompany ? (
+        <div className="mt-4 rounded-[1.4rem] border border-sky-300/20 bg-sky-300/10 px-4 py-3 text-sm text-sky-50">
+          Artisan attribue : {market.assignedArtisanCompany.legalName} • {market.assignedArtisanCompany.city}
+        </div>
+      ) : null}
 
       {market.rejectionReason ? (
         <div className="mt-4 rounded-[1.4rem] border border-rose-300/20 bg-rose-300/10 px-4 py-3 text-sm text-rose-100">
@@ -1079,7 +1224,7 @@ function MarketCard({
         </div>
       ) : null}
 
-      <form action={action} className="mt-5 space-y-3 rounded-[1.5rem] border border-white/10 bg-white/5 p-4">
+      <form action={statusAction} className="mt-5 space-y-3 rounded-[1.5rem] border border-white/10 bg-white/5 p-4">
         <input type="hidden" name="marketId" value={market.id} />
         <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto]">
           <select
@@ -1116,6 +1261,56 @@ function MarketCard({
           className="w-full rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm text-white outline-none transition placeholder:text-white/30 focus:border-sky-300/60"
         />
       </form>
+
+      {canAssign ? (
+        <form action={assignAction} className="mt-4 space-y-3 rounded-[1.5rem] border border-white/10 bg-sky-300/10 p-4">
+          <input type="hidden" name="marketId" value={market.id} />
+          <input type="hidden" name="executionStatus" value="ASSIGNED" />
+          <p className="text-sm font-medium text-white">Attribuer a un artisan approuve</p>
+          <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto]">
+            <select
+              name="assignedArtisanCompanyId"
+              defaultValue={market.assignedArtisanCompanyId ?? ""}
+              className="rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm text-white outline-none transition focus:border-sky-300/60"
+            >
+              <option value="" disabled>
+                Selectionner un artisan
+              </option>
+              {artisanOptions.map((artisan) => (
+                <option key={artisan.id} value={artisan.id}>
+                  {artisan.legalName} • {artisan.city} • {artisan.user.name}
+                </option>
+              ))}
+            </select>
+            <button
+              type="submit"
+              className="rounded-2xl border border-sky-300/20 bg-sky-500/20 px-4 py-3 text-sm font-medium text-white transition hover:bg-sky-500/30"
+            >
+              Attribuer
+            </button>
+          </div>
+        </form>
+      ) : null}
+
+      {market.assignedArtisanCompany ? (
+        <form action={executionAction} className="mt-4 grid gap-3 rounded-[1.5rem] border border-white/10 bg-white/5 p-4 md:grid-cols-[minmax(0,1fr)_auto]">
+          <input type="hidden" name="marketId" value={market.id} />
+          <select
+            name="executionStatus"
+            defaultValue={(market.executionStatus as MarketExecutionStatus) ?? "OPEN"}
+            className="rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm text-white outline-none transition focus:border-sky-300/60"
+          >
+            <option value="ASSIGNED">ASSIGNED</option>
+            <option value="COMPLETED">COMPLETED</option>
+          </select>
+          <button
+            type="submit"
+            className="rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-sm font-medium text-white transition hover:bg-white/15"
+          >
+            Mettre a jour l'execution
+          </button>
+        </form>
+      ) : null}
     </div>
   )
 }
@@ -1235,6 +1430,28 @@ function marketTone(status: MarketStatus): "amber" | "emerald" | "rose" | "slate
       return "rose"
     case "ARCHIVED":
       return "slate"
+  }
+}
+
+function executionStatusLabel(status: MarketExecutionStatus) {
+  switch (status) {
+    case "OPEN":
+      return "Ouvert"
+    case "ASSIGNED":
+      return "En cours"
+    case "COMPLETED":
+      return "Termine"
+  }
+}
+
+function executionTone(status: MarketExecutionStatus): "sky" | "emerald" | "slate" {
+  switch (status) {
+    case "OPEN":
+      return "slate"
+    case "ASSIGNED":
+      return "sky"
+    case "COMPLETED":
+      return "emerald"
   }
 }
 
