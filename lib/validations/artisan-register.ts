@@ -66,6 +66,19 @@ export const marketAdminStatusSchema = z.object({
   rejectionReason: z.string().trim().max(600).optional().nullable(),
 })
 
+export const marketAssignmentSchema = z.object({
+  marketId: z.string().trim().min(1),
+  assignedArtisanCompanyId: z.string().trim().min(1),
+  executionStatus: z.enum(["ASSIGNED", "COMPLETED"]),
+})
+
+export const marketExecutionStatusSchema = z.object({
+  marketId: z.string().trim().min(1),
+  executionStatus: z.enum(["ASSIGNED", "COMPLETED"]),
+})
+
 export type ArtisanRegisterInput = z.infer<typeof artisanRegisterSchema>
 export type MarketCreateInput = z.infer<typeof marketCreateSchema>
 export type MarketAdminStatusInput = z.infer<typeof marketAdminStatusSchema>
+export type MarketAssignmentInput = z.infer<typeof marketAssignmentSchema>
+export type MarketExecutionStatusInput = z.infer<typeof marketExecutionStatusSchema>
