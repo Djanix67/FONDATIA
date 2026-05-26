@@ -8,71 +8,82 @@ datasource db {
 }
 
 model User {
-  id            String        @id @default(cuid())
-  name          String
-  email         String        @unique
-  emailVerified DateTime?
-  image         String?
-  passwordHash  String
-  role          UserRole
-  companyStatus CompanyStatus @default(PENDING)
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
-  Account       Account[]
-  company       Company?
-  Session       Session[]
-  markets       Market[]
+  id                      String                 @id @default(cuid())
+  name                    String
+  email                   String                 @unique
+  emailVerified           DateTime?
+  image                   String?
+  passwordHash            String
+  role                    UserRole
+  companyStatus           CompanyStatus          @default(PENDING)
+  createdAt               DateTime               @default(now())
+  updatedAt               DateTime               @updatedAt
+  Account                 Account[]
+  company                 Company?
+  Session                 Session[]
+  markets                 Market[]               @relation("MarketOwner")
+  assignedMarketsAsUser   Market[]               @relation("MarketAssignedUser")
 }
 
 model Company {
-  id                    String        @id @default(cuid())
-  userId                String        @unique
-  legalName             String
-  siren                 String        @unique
-  siret                 String?       @unique
-  email                 String        @unique
-  phone                 String        @unique
-  postalCode            String
-  city                  String
-  address               String
-  kbisUrl               String
-  insuranceDecennaleUrl String
-  identityCardFrontUrl  String?
-  identityCardBackUrl   String?
-  status                CompanyStatus @default(PENDING)
-  validatedAt           DateTime?
-  rejectedReason        String?
-  createdAt             DateTime      @default(now())
-  updatedAt             DateTime      @updatedAt
-  user                  User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  markets               Market[]
+  id                       String                 @id @default(cuid())
+  userId                   String                 @unique
+  legalName                String
+  siren                    String                 @unique
+  siret                    String?                @unique
+  email                    String                 @unique
+  phone                    String                 @unique
+  postalCode               String
+  city                     String
+  address                  String
+  kbisUrl                  String
+  insuranceDecennaleUrl    String
+  identityCardFrontUrl     String?
+  identityCardBackUrl      String?
+  status                   CompanyStatus          @default(PENDING)
+  validatedAt              DateTime?
+  rejectedReason           String?
+  createdAt                DateTime               @default(now())
+  updatedAt                DateTime               @updatedAt
+  user                     User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  markets                  Market[]               @relation("MarketOwnerCompany")
+  assignedMarketsAsCompany Market[]               @relation("MarketAssignedCompany")
 }
 
 model Market {
-  id               String       @id @default(cuid())
-  ownerUserId      String
-  ownerCompanyId   String
-  title            String
-  description      String
-  activity         String
-  city             String
-  postalCode       String
-  budgetMin        Int?
-  budgetMax        Int?
-  timeframe        String?
-  desiredStartDate DateTime?
-  status           MarketStatus @default(PENDING_REVIEW)
-  adminNotes       String?
-  rejectionReason  String?
-  publishedAt      DateTime?
-  createdAt        DateTime     @default(now())
-  updatedAt        DateTime     @updatedAt
-  ownerUser        User         @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
-  ownerCompany     Company      @relation(fields: [ownerCompanyId], references: [id], onDelete: Cascade)
+  id                       String                 @id @default(cuid())
+  ownerUserId              String
+  ownerCompanyId           String
+  assignedArtisanUserId    String?
+  assignedArtisanCompanyId String?
+  title                    String
+  description              String
+  activity                 String
+  city                     String
+  postalCode               String
+  budgetMin                Int?
+  budgetMax                Int?
+  timeframe                String?
+  desiredStartDate         DateTime?
+  status                   MarketStatus           @default(PENDING_REVIEW)
+  executionStatus          MarketExecutionStatus  @default(OPEN)
+  adminNotes               String?
+  rejectionReason          String?
+  publishedAt              DateTime?
+  assignedAt               DateTime?
+  completedAt              DateTime?
+  createdAt                DateTime               @default(now())
+  updatedAt                DateTime               @updatedAt
+  ownerUser                User                   @relation("MarketOwner", fields: [ownerUserId], references: [id], onDelete: Cascade)
+  ownerCompany             Company                @relation("MarketOwnerCompany", fields: [ownerCompanyId], references: [id], onDelete: Cascade)
+  assignedArtisanUser      User?                  @relation("MarketAssignedUser", fields: [assignedArtisanUserId], references: [id], onDelete: SetNull)
+  assignedArtisanCompany   Company?               @relation("MarketAssignedCompany", fields: [assignedArtisanCompanyId], references: [id], onDelete: SetNull)
 
   @@index([ownerUserId, status])
   @@index([ownerCompanyId, status])
   @@index([status, createdAt])
+  @@index([assignedArtisanUserId, executionStatus])
+  @@index([assignedArtisanCompanyId, executionStatus])
 }
 
 model Account {
@@ -127,4 +138,10 @@ enum MarketStatus {
   LIVE
   REJECTED
   ARCHIVED
+}
+
+enum MarketExecutionStatus {
+  OPEN
+  ASSIGNED
+  COMPLETED
 }
