@@ -126,7 +126,7 @@ export default function HomePage() {
             </div>
 
             <h1 className="mt-6 max-w-4xl text-5xl font-semibold leading-tight tracking-tight text-slate-950 sm:text-6xl lg:text-7xl">
-              Une plateforme credible pour relier marches qualifies et artisans exigeants.
+              Une plateforme credible pour relier marches qualifies et artisans exigeants
             </h1>
 
             <p className="mt-6 max-w-3xl text-lg leading-8 text-slate-700">
@@ -214,7 +214,7 @@ export default function HomePage() {
               Qui sommes nous ?
             </p>
             <h2 className="mt-4 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">
-              Une plateforme pensee pour remettre de la confiance et du niveau dans les mises en relation BTP.
+              Une plateforme pensee pour remettre de la confiance et du niveau dans les mises en relation BTP
             </h2>
             <p className="mt-5 text-base leading-8 text-slate-700">
               Fondatia s'adresse aux artisans qui veulent acceder a des marches qualifies
@@ -255,7 +255,7 @@ export default function HomePage() {
               Les marches en ligne
             </p>
             <h2 className="mt-4 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">
-              Un apercu volontairement floute des futurs marches diffuses sur la plateforme.
+              Un apercu volontairement floute des futurs marches diffuses sur la plateforme
             </h2>
             <p className="mt-5 text-base leading-8 text-slate-700">
               Cette section donne une projection du type de missions que Fondatia preparera pour ses membres,
