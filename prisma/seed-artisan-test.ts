@@ -5,7 +5,8 @@ const prisma = new PrismaClient();
 
 async function main() {
   const email = process.env.ARTISAN_TEST_EMAIL ?? "artisan.test@fondatia.fr";
-  const password = process.env.ARTISAN_TEST_PASSWORD ?? "Test1234!";
+  const password = process.env.ARTISAN_TEST_PASSWORD;
+  if (!password) throw new Error("ARTISAN_TEST_PASSWORD doit être défini pour la recette.");
   const name = process.env.ARTISAN_TEST_NAME ?? "Artisan Test Fondatia";
   const legalName = process.env.ARTISAN_TEST_LEGAL_NAME ?? "FONDATIA Artisan Test";
   const siren = process.env.ARTISAN_TEST_SIREN ?? "823456781";
@@ -57,7 +58,6 @@ async function main() {
     });
 
     console.log(`Test artisan created: ${user.email}`);
-    console.log(`Password: ${password}`);
     return;
   }
 
@@ -117,7 +117,6 @@ async function main() {
   });
 
   console.log(`Test artisan ready: ${normalizedEmail}`);
-  console.log(`Password: ${password}`);
 }
 
 main()

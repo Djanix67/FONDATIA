@@ -5,7 +5,8 @@ const prisma = new PrismaClient();
 
 async function main() {
   const email = process.env.DONOR_TEST_EMAIL ?? "donneur-test@fondatia.fr";
-  const password = process.env.DONOR_TEST_PASSWORD ?? "DonneurFondatia2026!";
+  const password = process.env.DONOR_TEST_PASSWORD;
+  if (!password) throw new Error("DONOR_TEST_PASSWORD doit être défini pour la recette.");
   const name = process.env.DONOR_TEST_NAME ?? "Donneur Test Fondatia";
   const legalName = process.env.DONOR_TEST_LEGAL_NAME ?? "FONDATIA Donneur Test";
   const siren = process.env.DONOR_TEST_SIREN ?? "923456781";
@@ -57,7 +58,6 @@ async function main() {
     });
 
     console.log(`Test donor created: ${user.email}`);
-    console.log(`Password: ${password}`);
     return;
   }
 
@@ -117,7 +117,6 @@ async function main() {
   });
 
   console.log(`Test donor ready: ${normalizedEmail}`);
-  console.log(`Password: ${password}`);
 }
 
 main()
