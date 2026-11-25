@@ -1,5 +1,6 @@
 "use client"
 
+import Link from "next/link"
 import { useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { GlassCard } from "@/components/ui/glass-card"
@@ -304,6 +305,10 @@ export default function InscriptionArtisanPage() {
             </div>
 
             <form onSubmit={onSubmit} className="space-y-8">
+              <p className="text-sm leading-6 text-white/85">
+                Cet espace est réservé aux essais avec des données fictives. Les pièces sont envoyées dès leur sélection.
+                Avant de commencer, consultez les <Link className="underline" target="_blank" rel="noopener" href="/conditions-generales-utilisation">conditions générales d’utilisation</Link> et la <Link className="underline" target="_blank" rel="noopener" href="/politique-de-confidentialite">politique de confidentialité</Link>.
+              </p>
               <section className="space-y-4">
                 <p className="text-xs uppercase tracking-[0.2em] text-white/40">
                   Compte
