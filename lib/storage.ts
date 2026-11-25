@@ -124,3 +124,22 @@ export async function uploadSignupDocument({
     contentType: file.type,
   }
 }
+
+// The bucket must remain private, with a 10 MiB limit and allowed MIME types.
+export async function prepareCompanyDocumentUpload({
+  userId, documentType, fileName, contentType,
+}: {
+  userId: string
+  documentType: CompanyDocumentType
+  fileName: string
+  contentType: string
+}) {
+  if (!userId || !allowedMimeTypes.has(contentType)) {
+    throw new Error("Utilisateur ou format de fichier invalide.")
+  }
+  const { config, supabase } = createStorageClient()
+  const path = buildCompanyDocumentPath({ ownerKey: userId, documentType, fileName })
+  const { data, error } = await supabase.storage.from(config.bucket).createSignedUploadUrl(path)
+  if (error || !data) throw new Error("Impossible de préparer le téléversement.")
+  return { bucket: config.bucket, path, signedUrl: data.signedUrl, token: data.token, contentType, maxUploadSize }
+}

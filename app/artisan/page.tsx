@@ -1065,7 +1065,7 @@ function buildInboxItems({
       preview:
         "L'onglet Marche en ligne vous permet deja d'explorer les opportunites visibles sur la plateforme avec des filtres simples.",
       status: "A consulter",
-      tone: "amber",
+      tone: "amber" as const,
     },
     {
       id: "message-3",
@@ -1074,7 +1074,7 @@ function buildInboxItems({
       preview:
         "Les affectations reelles admin alimentent maintenant les vues de production et d'historique dans votre dashboard.",
       status: "Reel",
-      tone: "sky",
+      tone: "sky" as const,
     },
   ]
 }

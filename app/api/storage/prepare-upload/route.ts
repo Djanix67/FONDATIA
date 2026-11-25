@@ -30,7 +30,7 @@ export async function POST(req: Request) {
       )
     }
 
-    const uploadTarget = prepareCompanyDocumentUpload({
+    const uploadTarget = await prepareCompanyDocumentUpload({
       userId: String((session.user as { id?: string }).id ?? ""),
       documentType: parsed.data.documentType,
       fileName: parsed.data.fileName,

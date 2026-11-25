@@ -2,12 +2,16 @@
 
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
-import { useState } from "react"
+import { Suspense, useState } from "react"
 import { signIn } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { GlassCard } from "@/components/ui/glass-card"
 
 export default function LoginPage() {
+  return <Suspense fallback={<main className="min-h-screen bg-slate-950 p-24 text-white">Chargement de la connexion…</main>}><LoginForm /></Suspense>
+}
+
+function LoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [email, setEmail] = useState("")
@@ -39,7 +43,7 @@ export default function LoginPage() {
         return
       }
 
-      if (callbackUrl) {
+      if (callbackUrl && ["/admin", "/artisan", "/donneur-ordre"].includes(callbackUrl)) {
         router.push(callbackUrl)
         router.refresh()
         return
@@ -72,15 +76,15 @@ export default function LoginPage() {
         <div className="grid w-full max-w-5xl gap-10 lg:grid-cols-[1fr_520px]">
           <div className="flex flex-col justify-center">
             <div className="inline-flex w-fit items-center rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-white/70 backdrop-blur">
-              FONDATIA • Acces securise
+              FONDATIA • Accès sécurisé
             </div>
 
             <h1 className="mt-6 max-w-2xl text-4xl font-semibold tracking-tight text-white sm:text-5xl">
-              Connectez-vous a votre espace FONDATIA
+              Connectez-vous à votre espace FONDATIA
             </h1>
 
             <p className="mt-5 max-w-xl text-base leading-7 text-white/65 sm:text-lg">
-              Chaque profil est redirige vers l'espace qui lui correspond : admin, artisan ou donneur d'ordre.
+              Retrouvez votre dossier, vos informations et vos projets dans votre espace professionnel.
             </p>
           </div>
 
@@ -90,7 +94,7 @@ export default function LoginPage() {
                 Connexion
               </h2>
               <p className="mt-2 text-sm text-white/60">
-                Entrez vos identifiants pour acceder a votre espace.
+                Entrez vos identifiants pour accéder a votre espace.
               </p>
             </div>
 
@@ -100,7 +104,7 @@ export default function LoginPage() {
                 type="email"
                 value={email}
                 onChange={setEmail}
-                placeholder="admin@fondatia.fr"
+                placeholder="vous@entreprise.fr"
               />
 
               <Field
@@ -112,7 +116,7 @@ export default function LoginPage() {
               />
 
               {error ? (
-                <div className="rounded-2xl border border-red-400/20 bg-red-400/10 px-4 py-3 text-sm text-red-200">
+                <div role="alert" className="rounded-2xl border border-red-400/20 bg-red-400/10 px-4 py-3 text-sm text-red-200">
                   {error}
                 </div>
               ) : null}
@@ -127,7 +131,7 @@ export default function LoginPage() {
 
               <div className="flex items-center justify-between gap-4 text-sm text-white/55">
                 <Link href="/mot-de-passe-oublie" className="transition hover:text-white">
-                  Mot de passe oublie ?
+                  Mot de passe oublié ?
                 </Link>
                 <Link href="/inscription-artisan" className="transition hover:text-white">
                   Devenir artisan
@@ -158,6 +162,8 @@ function Field({
     <label className="block">
       <span className="mb-2 block text-sm font-medium text-white/80">{label}</span>
       <input
+        required
+        autoComplete={type === "password" ? "current-password" : "email"}
         type={type}
         value={value}
         onChange={(e) => onChange(e.target.value)}
